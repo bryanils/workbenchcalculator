@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:create.t3.gg)",
+      "WebFetch(domain:securityonline.info)",
+      "WebFetch(domain:unit42.paloaltonetworks.com)",
+      "Bash(bun pm *)"
+    ]
+  }
+}
