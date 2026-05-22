@@ -5,10 +5,16 @@ import { useTheme } from "next-themes";
 
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
+import { ButtonGroup } from "~/components/ui/button-group";
 
 type Theme = "light" | "dark" | "system";
 
-export function ThemeToggle({ className }: { className?: string }) {
+type Props = {
+  className?: string;
+  duration?: number;
+};
+
+export function ThemeToggle({ className, duration = 600 }: Props) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -55,25 +61,23 @@ export function ThemeToggle({ className }: { className?: string }) {
           ],
         },
         {
-          duration: 600,
+          duration,
           easing: "ease-in-out",
           pseudoElement: "::view-transition-new(root)",
         },
       );
     },
-    [theme, setTheme],
+    [theme, setTheme, duration],
   );
 
-  const active = mounted ? (theme as Theme) ?? "system" : "system";
+  const active = mounted ? ((theme as Theme) ?? "system") : "system";
 
   return (
-    <div
+    <ButtonGroup
       className={cn(
-        "inline-flex rounded-md border border-input bg-background shadow-xs",
+        "rounded-md border border-input bg-background shadow-xs",
         className,
       )}
-      role="radiogroup"
-      aria-label="Theme"
     >
       <Button
         type="button"
@@ -81,7 +85,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         size="icon-sm"
         onClick={(e: React.MouseEvent<HTMLButtonElement>) => handle("light", e)}
         aria-label="Light theme"
-        className="rounded-r-none border-r border-input"
+        className="rounded-l-md rounded-r-none border-0 shadow-none hover:bg-secondary"
       >
         <Sun className="h-4 w-4" />
       </Button>
@@ -91,7 +95,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         size="icon-sm"
         onClick={(e: React.MouseEvent<HTMLButtonElement>) => handle("dark", e)}
         aria-label="Dark theme"
-        className="rounded-none border-r border-input"
+        className="rounded-none border-0 border-l border-input shadow-none hover:bg-secondary"
       >
         <Moon className="h-4 w-4" />
       </Button>
@@ -101,10 +105,10 @@ export function ThemeToggle({ className }: { className?: string }) {
         size="icon-sm"
         onClick={(e: React.MouseEvent<HTMLButtonElement>) => handle("system", e)}
         aria-label="System theme"
-        className="rounded-l-none"
+        className="rounded-r-md rounded-l-none border-0 border-l border-input shadow-none hover:bg-secondary"
       >
         <Monitor className="h-4 w-4" />
       </Button>
-    </div>
+    </ButtonGroup>
   );
 }

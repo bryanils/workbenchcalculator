@@ -1,5 +1,6 @@
 import type { LumberBoardOut } from "~/lib/types";
 import { formatLength, type Unit } from "~/lib/units";
+import { Card } from "~/components/ui/card";
 
 type Props = {
   board: LumberBoardOut;
@@ -42,13 +43,13 @@ export function LumberDiagram({ board, index, unit }: Props) {
   });
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
+    <Card className="p-3">
       <div className="mb-1 flex items-center justify-between">
         <div className="text-sm font-semibold">
           Board {index + 1} — {board.materialLabel} @ {board.stockLen / 12} ft (
-          {board.stockLen}")
+          {board.stockLen}&quot;)
         </div>
-        <div className="text-xs text-stone-500">
+        <div className="text-xs text-muted-foreground">
           waste: {formatLength(board.wasteLen, unit)} (
           {((board.wasteLen / board.stockLen) * 100).toFixed(0)}%)
         </div>
@@ -56,7 +57,7 @@ export function LumberDiagram({ board, index, unit }: Props) {
 
       <svg
         viewBox={`0 0 ${totalWidth} ${height + 30}`}
-        className="w-full"
+        className="w-full text-foreground"
         role="img"
         aria-label={`Cut diagram for board ${index + 1}`}
       >
@@ -112,9 +113,10 @@ export function LumberDiagram({ board, index, unit }: Props) {
               x2={s.x + s.w}
               y1={-2}
               y2={height + 2}
-              stroke="#000"
+              stroke="currentColor"
               strokeWidth={1}
               strokeDasharray="2 2"
+              opacity={0.7}
             />
           ))}
 
@@ -124,21 +126,22 @@ export function LumberDiagram({ board, index, unit }: Props) {
             x2={drawableWidth}
             y1={height + 14}
             y2={height + 14}
-            stroke="#57534e"
+            stroke="currentColor"
             strokeWidth={1}
+            opacity={0.5}
           />
           <text
             x={drawableWidth / 2}
             y={height + 26}
             textAnchor="middle"
-            className="fill-stone-600 text-[10px]"
+            className="fill-muted-foreground text-[10px]"
           >
             {formatLength(board.stockLen, unit)} total
           </text>
         </g>
       </svg>
 
-      <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-stone-700">
+      <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-foreground">
         {board.cuts.map((c, i) => (
           <li key={i}>
             <span className="font-mono font-semibold">{c.partCode}</span>{" "}
@@ -146,6 +149,6 @@ export function LumberDiagram({ board, index, unit }: Props) {
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }

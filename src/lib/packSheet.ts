@@ -32,11 +32,14 @@ export function packSheets(
   sheetH: number,
   kerf: number,
 ): { layouts: SheetLayout[]; oversize: SheetCutInput[] } {
-  // Expand qty/order: each input is a single piece already.
-  // Sort by max dim descending — pack big stuff first.
+  // Normalize the sheet to landscape (long dim = SW). Pieces are normalized to
+  // landscape too, so both ends of the comparison live in the same orientation
+  // and a 72"×30" cut isn't falsely rejected from a 48"×96" sheet.
+  const SW = Math.max(sheetW, sheetH);
+  const SH = Math.min(sheetW, sheetH);
+
   const cuts = [...cutsRaw]
     .map((c) => {
-      // Force landscape orientation (longer side = w) for shelf packing.
       const w = Math.max(c.w, c.h);
       const h = Math.min(c.w, c.h);
       const rotated = w !== c.w;
@@ -48,11 +51,11 @@ export function packSheets(
   const layouts: SheetLayout[] = [];
 
   for (const cut of cuts) {
-    if (cut.w > sheetW || cut.h > sheetH) {
+    if (cut.w > SW || cut.h > SH) {
       oversize.push({ w: cut.w, h: cut.h, partCode: cut.partCode, purpose: cut.purpose });
       continue;
     }
-    placeOnSheets(cut, sheetW, sheetH, kerf, layouts);
+    placeOnSheets(cut, SW, SH, kerf, layouts);
   }
 
   for (const l of layouts) {

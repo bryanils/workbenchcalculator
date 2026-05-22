@@ -1,279 +1,355 @@
 import Head from "next/head";
-import { useMemo, useState } from "react";
-import { LUMBER, SHEETS } from "~/lib/materials";
-import { calculate } from "~/lib/calculator";
-import type { BenchConfig, Joinery } from "~/lib/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Printer, Upload, Download, Trash2, Hammer } from "lucide-react";
+import { calculateFromInputs } from "~/lib/calculator";
+import type { BenchConfig, CalcResult, SimpleInputs } from "~/lib/types";
 import { formatLength, fromInches, toInches, type Unit } from "~/lib/units";
 import { LumberDiagram } from "~/components/LumberDiagram";
 import { SheetDiagram } from "~/components/SheetDiagram";
 import { BenchIsoDiagram } from "~/components/BenchIsoDiagram";
+import { ElevationViews } from "~/components/ElevationViews";
+import { ThemeToggle } from "~/components/ThemeToggle";
+import { PRESETS } from "~/lib/presets";
+import {
+  STYLE_PROFILES,
+  type BenchStyleId,
+  type ViseKind,
+} from "~/lib/styles";
+import {
+  loadSavedDesigns,
+  newDesignId,
+  writeSavedDesigns,
+  type SavedDesign,
+} from "~/lib/storage";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Badge } from "~/components/ui/badge";
+import { Separator } from "~/components/ui/separator";
+import { Switch } from "~/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "~/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { Checkbox } from "~/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 
-type Tab = "overview" | "cutplan" | "materials" | "directions" | "print";
+const DEFAULT_INPUTS: SimpleInputs = {
+  styleId: "heavy-garage",
+  topLength: 72,
+  topDepth: 30,
+  totalHeight: 34,
+};
+
+type PrintSections = {
+  diagrams: boolean;
+  specs: boolean;
+  cutList: boolean;
+  lumberDiagrams: boolean;
+  sheetLayouts: boolean;
+  materials: boolean;
+  directions: boolean;
+};
+
+const DEFAULT_PRINT_SECTIONS: PrintSections = {
+  diagrams: true,
+  specs: true,
+  cutList: true,
+  lumberDiagrams: true,
+  sheetLayouts: true,
+  materials: true,
+  directions: true,
+};
+
+const PRINT_SECTION_LABELS: { key: keyof PrintSections; label: string }[] = [
+  { key: "diagrams", label: "Iso & elevation diagrams" },
+  { key: "specs", label: "Specifications" },
+  { key: "cutList", label: "Cut list table" },
+  { key: "lumberDiagrams", label: "Lumber cutting diagrams" },
+  { key: "sheetLayouts", label: "Sheet cutting layouts" },
+  { key: "materials", label: "Materials & tools" },
+  { key: "directions", label: "Build directions" },
+];
 
 type FormState = {
+  styleId: BenchStyleId;
   topLength: number;
-  topWidth: number;
+  topDepth: number;
   totalHeight: number;
-  overhang: number;
-  shelfHeight: number;
-  kerf: number;
-  legMaterialId: string;
-  apronMaterialId: string;
-  topMaterialId: string;
-  shelfMaterialId: string;
-  pegboardMaterialId: string;
-  includeShelf: boolean;
-  middleStretcher: boolean;
-  doubledTop: boolean;
   casters: boolean;
   pegboard: boolean;
   pegboardHeight: number;
-  toolWell: boolean;
-  toolWellWidth: number;
-  diagonalBraces: boolean;
-  edgeBand: boolean;
-  finishCoats: number;
-  joinery: Joinery;
-  stockLengthPreference: number | "any";
-  customStockEnabled: boolean;
-  customStockInches: number;
-  customStockPricePerFt: number;
+  viseOverride?: ViseKind;
+  joineryOverride?: "pocket" | "lag" | "mortise";
+  drawerCount: number;
+  drawerLocation: "under-top" | "below-shelf";
+  drawerSlideType: "metal" | "wooden";
 };
 
-const DEFAULTS_INCH: FormState = {
-  topLength: 60,
-  topWidth: 24,
-  totalHeight: 36,
-  overhang: 1,
-  shelfHeight: 10,
-  kerf: 0.125,
-  legMaterialId: "4x4",
-  apronMaterialId: "2x4",
-  topMaterialId: "ply_3_4",
-  shelfMaterialId: "ply_1_2",
-  pegboardMaterialId: "hdb_1_4",
-  includeShelf: true,
-  middleStretcher: false,
-  doubledTop: false,
-  casters: false,
-  pegboard: false,
-  pegboardHeight: 24,
-  toolWell: false,
-  toolWellWidth: 4,
-  diagonalBraces: false,
-  edgeBand: true,
-  finishCoats: 2,
-  joinery: "pocket",
-  stockLengthPreference: "any",
-  customStockEnabled: false,
-  customStockInches: 96,
-  customStockPricePerFt: 1.0,
-};
+function buildInputs(form: FormState, unit: Unit): SimpleInputs {
+  return {
+    styleId: form.styleId,
+    topLength: toInches(form.topLength, unit),
+    topDepth: toInches(form.topDepth, unit),
+    totalHeight: toInches(form.totalHeight, unit),
+    casters: form.casters,
+    pegboard: form.pegboard,
+    pegboardHeight: toInches(form.pegboardHeight, unit),
+    viseOverride: form.viseOverride,
+    joineryOverride: form.joineryOverride,
+    drawerCount: form.drawerCount,
+    drawerLocation: form.drawerLocation,
+    drawerSlideType: form.drawerSlideType,
+  };
+}
 
 export default function Home() {
   const [unit, setUnit] = useState<Unit>("in");
-  const [form, setForm] = useState<FormState>(DEFAULTS_INCH);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [form, setForm] = useState<FormState>(() => formFromInputs(DEFAULT_INPUTS));
+  const [savedDesigns, setSavedDesigns] = useState<SavedDesign[]>([]);
+  const [designName, setDesignName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [printSections, setPrintSections] = useState<PrintSections>(DEFAULT_PRINT_SECTIONS);
+
+  useEffect(() => {
+    setSavedDesigns(loadSavedDesigns());
+  }, []);
+
+  const inputs = useMemo(() => buildInputs(form, unit), [form, unit]);
+  const result: CalcResult = useMemo(() => calculateFromInputs(inputs), [inputs]);
 
   const handleUnitChange = (newUnit: Unit) => {
     if (newUnit === unit) return;
     setForm((f) => ({
       ...f,
-      topLength: round(fromInches(toInches(f.topLength, unit), newUnit)),
-      topWidth: round(fromInches(toInches(f.topWidth, unit), newUnit)),
-      totalHeight: round(fromInches(toInches(f.totalHeight, unit), newUnit)),
-      overhang: round(fromInches(toInches(f.overhang, unit), newUnit)),
-      shelfHeight: round(fromInches(toInches(f.shelfHeight, unit), newUnit)),
-      pegboardHeight: round(fromInches(toInches(f.pegboardHeight, unit), newUnit)),
-      toolWellWidth: round(fromInches(toInches(f.toolWellWidth, unit), newUnit)),
-      kerf: roundFine(fromInches(toInches(f.kerf, unit), newUnit)),
-      customStockInches: round(fromInches(toInches(f.customStockInches, unit), newUnit)),
+      topLength: roundUI(fromInches(toInches(f.topLength, unit), newUnit)),
+      topDepth: roundUI(fromInches(toInches(f.topDepth, unit), newUnit)),
+      totalHeight: roundUI(fromInches(toInches(f.totalHeight, unit), newUnit)),
+      pegboardHeight: roundUI(fromInches(toInches(f.pegboardHeight, unit), newUnit)),
     }));
     setUnit(newUnit);
   };
 
-  const config: BenchConfig = useMemo(
-    () => ({
-      topLength: toInches(form.topLength, unit),
-      topWidth: toInches(form.topWidth, unit),
-      totalHeight: toInches(form.totalHeight, unit),
-      overhang: toInches(form.overhang, unit),
-      shelfHeight: toInches(form.shelfHeight, unit),
-      kerf: toInches(form.kerf, unit),
-      legMaterialId: form.legMaterialId,
-      apronMaterialId: form.apronMaterialId,
-      topMaterialId: form.topMaterialId,
-      shelfMaterialId: form.shelfMaterialId,
-      pegboardMaterialId: form.pegboardMaterialId,
-      includeShelf: form.includeShelf,
-      middleStretcher: form.middleStretcher,
-      doubledTop: form.doubledTop,
-      casters: form.casters,
-      pegboard: form.pegboard,
-      pegboardHeight: toInches(form.pegboardHeight, unit),
-      toolWell: form.toolWell,
-      toolWellWidth: toInches(form.toolWellWidth, unit),
-      diagonalBraces: form.diagonalBraces,
-      edgeBand: form.edgeBand,
-      finishCoats: form.finishCoats,
-      joinery: form.joinery,
-      stockLengthPreference: form.customStockEnabled
-        ? toInches(form.customStockInches, unit)
-        : form.stockLengthPreference,
-      customLumberPricePerFt: form.customStockEnabled
-        ? form.customStockPricePerFt
-        : undefined,
-    }),
-    [form, unit],
-  );
+  const handleStyleChange = (styleId: BenchStyleId) => {
+    const s = STYLE_PROFILES.find((x) => x.id === styleId);
+    if (!s) return;
+    setForm({
+      styleId: s.id,
+      topLength: unit === "in" ? s.defaultLength : roundUI(fromInches(s.defaultLength, unit)),
+      topDepth: unit === "in" ? s.defaultDepth : roundUI(fromInches(s.defaultDepth, unit)),
+      totalHeight: unit === "in" ? s.defaultHeight : roundUI(fromInches(s.defaultHeight, unit)),
+      casters: s.casters,
+      pegboard: false,
+      pegboardHeight: 24,
+      viseOverride: undefined,
+      joineryOverride: undefined,
+      drawerCount: s.defaultDrawerCount ?? 0,
+      drawerLocation: s.defaultDrawerLocation ?? "under-top",
+      drawerSlideType: s.defaultDrawerSlideType ?? "metal",
+    });
+  };
 
-  const result = useMemo(() => calculate(config), [config]);
+  const handleSaveDesign = () => {
+    const name = designName.trim() || `Design ${savedDesigns.length + 1}`;
+    const next: SavedDesign[] = [
+      ...savedDesigns,
+      {
+        id: newDesignId(),
+        name,
+        savedAt: new Date().toISOString(),
+        input: buildInputs(form, unit),
+      },
+    ];
+    setSavedDesigns(next);
+    writeSavedDesigns(next);
+    setDesignName("");
+  };
 
-  const legHeightApprox = useMemo(() => {
-    const top = SHEETS.find((s) => s.id === form.topMaterialId);
-    const t = (top?.thickness ?? 0.75) * (form.doubledTop ? 2 : 1);
-    const caster = form.casters ? 3 : 0;
-    return Math.max(1, toInches(form.totalHeight, unit) - t - caster);
-  }, [form, unit]);
+  const handleLoadDesign = (id: string) => {
+    const d = savedDesigns.find((x) => x.id === id);
+    if (!d) return;
+    setUnit("in");
+    setForm(formFromInputs(d.input));
+  };
 
-  const u = unit === "in" ? '"' : " mm";
+  const handleDeleteDesign = (id: string) => {
+    const next = savedDesigns.filter((d) => d.id !== id);
+    setSavedDesigns(next);
+    writeSavedDesigns(next);
+  };
+
+  const handleExportJson = () => {
+    const data = {
+      schema: "workbench-calculator/v2",
+      exportedAt: new Date().toISOString(),
+      input: buildInputs(form, unit),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `workbench-${(designName || "design").trim().replace(/\s+/g, "-")}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result)) as { input?: SimpleInputs };
+        if (data?.input) {
+          setUnit("in");
+          setForm(formFromInputs(data.input));
+        }
+      } catch {
+        alert("Could not parse that JSON file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleLoadPreset = (id: string) => {
+    const p = PRESETS.find((x) => x.id === id);
+    if (!p) return;
+    setUnit("in");
+    setForm(formFromInputs(p.input));
+  };
+
+  const config = result.derived;
 
   return (
     <>
       <Head>
-        <title>Workbench Calculator — full cut plan, materials, directions</title>
+        <title>Workbench Calculator — real plans, real cut lists</title>
         <meta
           name="description"
-          content="Pick standard lumber + sheet goods or enter custom stock, set bench dimensions, and get a printable cut list with cutting diagrams, materials list, hardware, and step-by-step build directions."
+          content="Pick a real workbench style — Roubo, Moravian, Knockdown Nicholson, Garage Workhorse — set your dimensions, get a structurally-sound cut list, materials list, and step-by-step build directions."
         />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="min-h-screen bg-stone-100 text-stone-900">
+      <main className="min-h-screen bg-background text-foreground">
         <div className="mx-auto max-w-7xl px-4 py-6">
           <header className="no-print mb-6 flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">Workbench Calculator</h1>
-              <p className="text-sm text-stone-600">
-                Set dimensions, pick standard or custom lumber, get a printable cut
-                plan, materials list, and step-by-step build directions.
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+                <Hammer className="size-5" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  Workbench Calculator
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Pick a real bench style, set three dimensions, get a buildable plan.
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-700"
-              >
-                Print build sheet
-              </button>
-              <div className="inline-flex overflow-hidden rounded-md border border-stone-300 bg-white text-sm">
-                <button
-                  type="button"
-                  onClick={() => handleUnitChange("in")}
-                  className={`px-3 py-1.5 ${
-                    unit === "in"
-                      ? "bg-stone-900 text-white"
-                      : "text-stone-700 hover:bg-stone-100"
-                  }`}
-                >
-                  in
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUnitChange("mm")}
-                  className={`px-3 py-1.5 ${
-                    unit === "mm"
-                      ? "bg-stone-900 text-white"
-                      : "text-stone-700 hover:bg-stone-100"
-                  }`}
-                >
-                  mm
-                </button>
-              </div>
+              <UnitToggle value={unit} onChange={handleUnitChange} />
+              <ThemeToggle />
+              <PrintMenu
+                sections={printSections}
+                setSections={setPrintSections}
+              />
             </div>
           </header>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[24rem_1fr]">
-            {/* INPUTS */}
-            <section className="no-print space-y-5 rounded-lg border border-stone-200 bg-white p-5 shadow-sm self-start lg:sticky lg:top-4">
-              <Inputs form={form} setForm={setForm} unitSuffix={u} unit={unit} />
-            </section>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1fr]">
+            <aside className="no-print space-y-4 self-start lg:sticky lg:top-4">
+              <SidebarInputs
+                form={form}
+                setForm={setForm}
+                unit={unit}
+                onStyleChange={handleStyleChange}
+                onLoadPreset={handleLoadPreset}
+              />
+              <SavedDesignsCard
+                designs={savedDesigns}
+                designName={designName}
+                setDesignName={setDesignName}
+                onSave={handleSaveDesign}
+                onLoad={handleLoadDesign}
+                onDelete={handleDeleteDesign}
+                onExport={handleExportJson}
+                onImport={(f) => handleImportFile(f)}
+                fileInputRef={fileInputRef}
+              />
+            </aside>
 
-            {/* RESULTS */}
-            <section>
-              {/* Tab bar */}
-              <div className="no-print mb-4 flex flex-wrap gap-1 border-b border-stone-200">
-                {(
-                  [
-                    ["overview", "Overview"],
-                    ["cutplan", "Cut Plan"],
-                    ["materials", "Materials"],
-                    ["directions", "Directions"],
-                    ["print", "Print preview"],
-                  ] as [Tab, string][]
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setTab(id)}
-                    className={`-mb-px border-b-2 px-3 py-2 text-sm ${
-                      tab === id
-                        ? "border-stone-900 font-semibold text-stone-900"
-                        : "border-transparent text-stone-600 hover:text-stone-900"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
+            <section className="space-y-4">
               {result.warnings.length > 0 && (
-                <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
-                  <h3 className="font-semibold text-amber-900">Warnings</h3>
-                  <ul className="mt-2 list-inside list-disc text-sm text-amber-900">
-                    {result.warnings.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                </div>
+                <Alert variant="destructive">
+                  <AlertTitle>Calculator warnings</AlertTitle>
+                  <AlertDescription>
+                    <ul className="ml-5 list-disc text-sm">
+                      {result.warnings.map((w, i) => (
+                        <li key={i}>{w}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
               )}
 
-              {/* Overview */}
-              {tab === "overview" && (
-                <OverviewTab
-                  result={result}
-                  config={config}
-                  legHeight={legHeightApprox}
-                  unit={unit}
-                />
-              )}
+              <Tabs defaultValue="overview" className="no-print space-y-4">
+                <TabsList>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="cutplan">Cut Plan</TabsTrigger>
+                  <TabsTrigger value="materials">Materials</TabsTrigger>
+                  <TabsTrigger value="directions">Directions</TabsTrigger>
+                  <TabsTrigger value="print">Print preview</TabsTrigger>
+                </TabsList>
 
-              {tab === "cutplan" && <CutPlanTab result={result} unit={unit} />}
+                <TabsContent value="overview" className="space-y-4">
+                  <OverviewTab result={result} config={config} unit={unit} />
+                </TabsContent>
+                <TabsContent value="cutplan" className="space-y-4">
+                  <CutPlanTab result={result} unit={unit} />
+                </TabsContent>
+                <TabsContent value="materials" className="space-y-4">
+                  <MaterialsTab result={result} />
+                </TabsContent>
+                <TabsContent value="directions" className="space-y-4">
+                  <DirectionsTab result={result} />
+                </TabsContent>
+                <TabsContent value="print" className="space-y-4">
+                  <PrintPreview
+                    result={result}
+                    config={config}
+                    unit={unit}
+                    sections={printSections}
+                  />
+                </TabsContent>
+              </Tabs>
 
-              {tab === "materials" && (
-                <MaterialsTab result={result} unit={unit} />
-              )}
-
-              {tab === "directions" && (
-                <DirectionsTab result={result} unit={unit} />
-              )}
-
-              {tab === "print" && (
-                <PrintPreview
-                  result={result}
-                  config={config}
-                  legHeight={legHeightApprox}
-                  unit={unit}
-                />
-              )}
-
-              {/* When printing, render full document regardless of tab */}
               <div className="print-only">
                 <PrintPreview
                   result={result}
                   config={config}
-                  legHeight={legHeightApprox}
                   unit={unit}
+                  sections={printSections}
                 />
               </div>
             </section>
@@ -285,845 +361,933 @@ export default function Home() {
 }
 
 /* ====================================================================== */
-/*                                Inputs                                  */
+/*                              SIDEBAR                                   */
 /* ====================================================================== */
 
-function Inputs({
-  form,
-  setForm,
-  unitSuffix,
-  unit,
+function SidebarInputs({
+  form, setForm, unit, onStyleChange, onLoadPreset,
 }: {
   form: FormState;
   setForm: (f: FormState) => void;
-  unitSuffix: string;
+  unit: Unit;
+  onStyleChange: (id: BenchStyleId) => void;
+  onLoadPreset: (id: string) => void;
+}) {
+  const style = STYLE_PROFILES.find((s) => s.id === form.styleId)!;
+  const u = unit === "in" ? '"' : " mm";
+  const [lenMin, lenMax] = style.lengthRange;
+  const [depMin, depMax] = style.depthRange;
+  const [hMin, hMax] = style.heightRange;
+  const conv = (i: number) => (unit === "in" ? i : Math.round(fromInches(i, unit)));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Design your bench</CardTitle>
+        <CardDescription>
+          The bench style picks every structural choice. You set the size.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-2">
+          <Label>Bench style</Label>
+          <Select value={form.styleId} onValueChange={(v) => onStyleChange(v as BenchStyleId)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Pick a style…" />
+            </SelectTrigger>
+            <SelectContent>
+              {STYLE_PROFILES.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="rounded-md border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+            <div className="font-medium text-foreground">{style.useCase}</div>
+            <div className="mt-1">{style.blurb}</div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="grid grid-cols-3 gap-2">
+          <DimField label="Length" hint={`${conv(lenMin)}-${conv(lenMax)}${u}`} suffix={u} step={unit === "in" ? 0.25 : 1}
+            value={form.topLength} onChange={(v) => setForm({ ...form, topLength: v })} />
+          <DimField label="Depth" hint={`${conv(depMin)}-${conv(depMax)}${u}`} suffix={u} step={unit === "in" ? 0.25 : 1}
+            value={form.topDepth} onChange={(v) => setForm({ ...form, topDepth: v })} />
+          <DimField label="Height" hint={`${conv(hMin)}-${conv(hMax)}${u}`} suffix={u} step={unit === "in" ? 0.25 : 1}
+            value={form.totalHeight} onChange={(v) => setForm({ ...form, totalHeight: v })} />
+        </div>
+
+        <Separator />
+
+        <div className="space-y-3">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Accessories
+          </div>
+          <ToggleRow
+            label="Locking casters"
+            description="Roll-around bench — 4x4 posts recommended"
+            checked={form.casters}
+            onChange={(v) => setForm({ ...form, casters: v })}
+          />
+          <ToggleRow
+            label="Pegboard back"
+            description="Tool storage panel mounted above the top"
+            checked={form.pegboard}
+            onChange={(v) => setForm({ ...form, pegboard: v })}
+          />
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Vise (override style default)</Label>
+            <Select
+              value={form.viseOverride ?? "style-default"}
+              onValueChange={(v) =>
+                setForm({
+                  ...form,
+                  viseOverride: v === "style-default" ? undefined : (v as ViseKind),
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="style-default">
+                  Style default ({prettyVise(style.vise)})
+                </SelectItem>
+                <SelectItem value="none">No vise</SelectItem>
+                <SelectItem value="front-face-vise">Front face vise</SelectItem>
+                <SelectItem value="leg-vise">Leg vise</SelectItem>
+                <SelectItem value="tail-vise">Tail vise</SelectItem>
+                <SelectItem value="quick-release-9in">Quick-release 9&quot;</SelectItem>
+                <SelectItem value="pipe-clamp-vise">Pipe-clamp (shop-built)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Joinery (override style default)</Label>
+            <Select
+              value={form.joineryOverride ?? "style-default"}
+              onValueChange={(v) =>
+                setForm({
+                  ...form,
+                  joineryOverride:
+                    v === "style-default" ? undefined : (v as FormState["joineryOverride"]),
+                })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="style-default">Style default ({style.joinery})</SelectItem>
+                <SelectItem value="pocket">Pocket screws</SelectItem>
+                <SelectItem value="lag">Lag bolts</SelectItem>
+                <SelectItem value="mortise">Mortise &amp; tenon</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Drawers
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Number of drawers</Label>
+            <Select
+              value={String(form.drawerCount)}
+              onValueChange={(v) => setForm({ ...form, drawerCount: parseInt(v, 10) })}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">None</SelectItem>
+                <SelectItem value="1">1</SelectItem>
+                <SelectItem value="2">2</SelectItem>
+                <SelectItem value="3">3</SelectItem>
+                <SelectItem value="4">4</SelectItem>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="6">6</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="text-[10px] text-muted-foreground">
+              Style default: {style.defaultDrawerCount ?? 0}
+            </div>
+          </div>
+          {form.drawerCount > 0 && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Location</Label>
+                <Select
+                  value={form.drawerLocation}
+                  onValueChange={(v) =>
+                    setForm({ ...form, drawerLocation: v as FormState["drawerLocation"] })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="under-top">Hanging under top (row)</SelectItem>
+                    <SelectItem value="below-shelf">
+                      End-of-bench column (above shelf)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Slide type</Label>
+                <Select
+                  value={form.drawerSlideType}
+                  onValueChange={(v) =>
+                    setForm({ ...form, drawerSlideType: v as FormState["drawerSlideType"] })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="metal">Metal ball-bearing slides</SelectItem>
+                    <SelectItem value="wooden">Shop-made wooden runners</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Browse built-in plans</Label>
+          <Select onValueChange={onLoadPreset}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Load preset…" />
+            </SelectTrigger>
+            <SelectContent>
+              {PRESETS.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DimField({
+  label, hint, suffix, value, onChange, step = 1,
+}: {
+  label: string;
+  hint?: string;
+  suffix: string;
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <div className="relative">
+        <Input
+          type="number"
+          inputMode="decimal"
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          className="pr-8 text-sm tabular-nums"
+        />
+        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+          {suffix}
+        </span>
+      </div>
+      {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
+    </div>
+  );
+}
+
+function ToggleRow({
+  label, description, checked, onChange,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex-1">
+        <div className="text-sm font-medium">{label}</div>
+        {description && (
+          <div className="text-[11px] text-muted-foreground">{description}</div>
+        )}
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
+function SavedDesignsCard({
+  designs, designName, setDesignName, onSave, onLoad, onDelete, onExport, onImport, fileInputRef,
+}: {
+  designs: SavedDesign[];
+  designName: string;
+  setDesignName: (s: string) => void;
+  onSave: () => void;
+  onLoad: (id: string) => void;
+  onDelete: (id: string) => void;
+  onExport: () => void;
+  onImport: (f: File) => void;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Saved designs</CardTitle>
+        <CardDescription>Saved locally in your browser</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-2">
+          <Input
+            value={designName}
+            placeholder="Name this design"
+            onChange={(e) => setDesignName(e.target.value)}
+          />
+          <Button variant="default" onClick={onSave} className="shrink-0">Save</Button>
+        </div>
+
+        {designs.length > 0 && (
+          <div className="space-y-1">
+            {designs.map((d) => (
+              <div
+                key={d.id}
+                className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
+              >
+                <button
+                  type="button"
+                  onClick={() => onLoad(d.id)}
+                  className="flex-1 truncate text-left hover:text-primary"
+                  title={`Saved ${new Date(d.savedAt).toLocaleString()}`}
+                >
+                  {d.name}
+                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Delete ${d.name}`}
+                  onClick={() => onDelete(d.id)}
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Separator />
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" size="sm" onClick={onExport} className="gap-1.5">
+            <Download className="size-3.5" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            className="gap-1.5"
+          >
+            <Upload className="size-3.5" />
+            Import
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onImport(f);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ====================================================================== */
+/*                          OVERVIEW TAB                                  */
+/* ====================================================================== */
+
+function OverviewTab({
+  result, config, unit,
+}: {
+  result: CalcResult;
+  config: BenchConfig;
   unit: Unit;
 }) {
   return (
     <>
-      <details open className="group">
-        <summary className="cursor-pointer list-none">
-          <h2 className="inline text-lg font-semibold">Dimensions</h2>
-          <span className="ml-2 text-xs text-stone-500 group-open:hidden">click to expand</span>
-        </summary>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <NumField
-            label="Top length (W)"
-            hint="along the front"
-            suffix={unitSuffix}
-            value={form.topLength}
-            onChange={(v) => setForm({ ...form, topLength: v })}
-          />
-          <NumField
-            label="Top depth (D)"
-            hint="front-to-back"
-            suffix={unitSuffix}
-            value={form.topWidth}
-            onChange={(v) => setForm({ ...form, topWidth: v })}
-          />
-          <NumField
-            label="Total height (H)"
-            hint="floor to top"
-            suffix={unitSuffix}
-            value={form.totalHeight}
-            onChange={(v) => setForm({ ...form, totalHeight: v })}
-          />
-          <NumField
-            label="Top overhang"
-            hint="each side, past legs"
-            suffix={unitSuffix}
-            value={form.overhang}
-            onChange={(v) => setForm({ ...form, overhang: v })}
-          />
-        </div>
-      </details>
+      <Card>
+        <CardContent className="space-y-4">
+          <BenchIsoDiagram config={config} unit={unit} />
+          <ElevationViews config={config} unit={unit} />
+        </CardContent>
+      </Card>
 
-      <details open>
-        <summary className="cursor-pointer list-none">
-          <h2 className="inline text-lg font-semibold">Materials</h2>
-        </summary>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <SelectField
-            label="Legs"
-            value={form.legMaterialId}
-            onChange={(v) => setForm({ ...form, legMaterialId: v })}
-            options={LUMBER.map((l) => ({ value: l.id, label: l.label }))}
-          />
-          <SelectField
-            label="Aprons / stretchers"
-            value={form.apronMaterialId}
-            onChange={(v) => setForm({ ...form, apronMaterialId: v })}
-            options={LUMBER.map((l) => ({ value: l.id, label: l.label }))}
-          />
-          <SelectField
-            label="Top"
-            value={form.topMaterialId}
-            onChange={(v) => setForm({ ...form, topMaterialId: v })}
-            options={SHEETS.map((s) => ({ value: s.id, label: s.label }))}
-          />
-          <SelectField
-            label="Lower shelf"
-            value={form.shelfMaterialId}
-            onChange={(v) => setForm({ ...form, shelfMaterialId: v })}
-            options={SHEETS.map((s) => ({ value: s.id, label: s.label }))}
-            disabled={!form.includeShelf}
-          />
-          <SelectField
-            label="Pegboard sheet"
-            value={form.pegboardMaterialId}
-            onChange={(v) => setForm({ ...form, pegboardMaterialId: v })}
-            options={SHEETS.map((s) => ({ value: s.id, label: s.label }))}
-            disabled={!form.pegboard}
-          />
-        </div>
+      <StabilityCard result={result} />
+      <SpecCard config={config} result={result} unit={unit} />
+      <DesignNotesCard config={config} />
+    </>
+  );
+}
 
-        <div className="mt-4 rounded border border-stone-200 bg-stone-50 p-3">
-          <CheckField
-            label="Use custom lumber stock length"
-            checked={form.customStockEnabled}
-            onChange={(v) => setForm({ ...form, customStockEnabled: v })}
-          />
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            <NumField
-              label="Custom stock length"
-              hint="single board length you can buy"
-              suffix={unitSuffix}
-              value={form.customStockInches}
-              onChange={(v) => setForm({ ...form, customStockInches: v })}
-              disabled={!form.customStockEnabled}
-            />
-            <NumField
-              label="Custom price"
-              hint="$/ft (estimate)"
-              value={form.customStockPricePerFt}
-              step={0.05}
-              onChange={(v) => setForm({ ...form, customStockPricePerFt: v })}
-              disabled={!form.customStockEnabled}
-            />
-          </div>
-          {!form.customStockEnabled && (
-            <div className="mt-2">
-              <SelectField
-                label="Stock length preference"
-                value={String(form.stockLengthPreference)}
-                onChange={(v) =>
-                  setForm({
-                    ...form,
-                    stockLengthPreference: v === "any" ? "any" : Number(v),
-                  })
-                }
-                options={[
-                  { value: "any", label: "Any (optimize)" },
-                  { value: "96", label: "8 ft (96\")" },
-                  { value: "120", label: "10 ft (120\")" },
-                  { value: "144", label: "12 ft (144\")" },
-                  { value: "168", label: "14 ft (168\")" },
-                  { value: "192", label: "16 ft (192\")" },
-                ]}
-              />
-            </div>
+function StabilityCard({ result }: { result: CalcResult }) {
+  const s = result.stability;
+  const variant: "default" | "secondary" | "destructive" | "outline" =
+    s.verdict === "solid"
+      ? "default"
+      : s.verdict === "acceptable"
+        ? "secondary"
+        : s.verdict === "marginal"
+          ? "outline"
+          : "destructive";
+  const verdictLabel = {
+    solid: "Solid build",
+    acceptable: "Acceptable",
+    marginal: "Marginal",
+    unstable: "Unstable",
+  }[s.verdict];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Stability assessment
+          <Badge variant={variant}>{verdictLabel}</Badge>
+          <Badge variant="outline" className="font-mono">{s.score}/100</Badge>
+        </CardTitle>
+        <CardDescription>
+          Top sag, racking resistance, footprint ratio.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <MetricBox label="Top sag (200 lb)" value={`${s.topSagInches.toFixed(2)}"`}
+            sub={`limit ${s.topSagLimitInches.toFixed(2)}"`}
+            ok={s.topSagInches <= s.topSagLimitInches} />
+          <MetricBox label="Racking" value={`${s.rackingResistanceLbf.toFixed(0)} lbf`}
+            sub="lateral push" ok={s.rackingResistanceLbf > 200} />
+          <MetricBox label="Footprint" value={s.tipRatio.toFixed(2)}
+            sub="width / height" ok={s.tipRatio >= 0.45} />
+          <MetricBox label="Weight" value={`${s.baseWeightLb.toFixed(0)} lb`}
+            sub="assembled" ok={s.baseWeightLb > 50} />
+        </div>
+        {s.warnings.length > 0 && (
+          <Alert variant="destructive">
+            <AlertTitle>Structural concerns</AlertTitle>
+            <AlertDescription>
+              <ul className="ml-5 list-disc">
+                {s.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+        {s.notes.length > 0 && (
+          <ul className="ml-5 list-disc text-sm text-muted-foreground">
+            {s.notes.map((n, i) => <li key={i}>{n}</li>)}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MetricBox({
+  label, value, sub, ok,
+}: { label: string; value: string; sub?: string; ok: boolean }) {
+  return (
+    <div className={`rounded-md border p-2.5 ${ok ? "border-border bg-muted/40" : "border-destructive/50 bg-destructive/10"}`}>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums">{value}</div>
+      {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+function SpecCard({
+  config, result, unit,
+}: { config: BenchConfig; result: CalcResult; unit: Unit }) {
+  const style = STYLE_PROFILES.find((s) => s.id === config.styleId)!;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Specifications</CardTitle>
+        <CardDescription>Derived from the {style.name} profile.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+          <SpecRow label="Footprint" value={`${formatLength(config.topLength, unit)} × ${formatLength(config.topDepth, unit)}`} />
+          <SpecRow label="Height" value={formatLength(config.totalHeight, unit)} />
+          <SpecRow label="Legs" value={`4× ${config.legMaterialId}${config.legSplayDeg > 0 ? ` (splay ${config.legSplayDeg}°)` : ""}`} />
+          <SpecRow label="Aprons" value={config.apronMaterialId} />
+          <SpecRow label="Top" value={topDescription(config)} />
+          <SpecRow label="Joinery" value={config.joinery + (config.knockdown ? " (knockdown)" : "")} />
+          <SpecRow label="Floor stretchers" value={config.stretchers.floorStretchers ? `${config.stretcherMaterialId} @ ${formatLength(config.stretchers.floorStretcherHeight, unit)}` : "none"} />
+          <SpecRow label="Center stretcher" value={config.stretchers.centerStretcher ? "yes" : "no"} />
+          <SpecRow label="Lower shelf" value={config.stretchers.lowerShelf ? `at ${formatLength(config.stretchers.shelfHeight, unit)}` : "none"} />
+          <SpecRow label="Vise" value={prettyVise(config.vise)} />
+          <SpecRow label="Casters" value={config.casters ? "4× HD locking" : "none"} />
+          <SpecRow label="Pegboard" value={config.pegboard ? `${formatLength(config.pegboardHeight, unit)} tall` : "none"} />
+          <SpecRow label="Dog holes" value={config.dogHoles ? `3/4" @ ${formatLength(config.dogHoleSpacing, unit)} OC` : "none"} />
+          <SpecRow label="Est. weight" value={`${result.stability.baseWeightLb.toFixed(0)} lb`} />
+          {result.totals.estimatedCost !== undefined && (
+            <SpecRow label="Est. materials" value={`$${result.totals.estimatedCost.toFixed(0)}`} />
           )}
-        </div>
-      </details>
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
 
-      <details open>
-        <summary className="cursor-pointer list-none">
-          <h2 className="inline text-lg font-semibold">Joinery</h2>
-        </summary>
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          {(
-            [
-              ["pocket", "Pocket screws", "Beginner-friendly Kreg jig — fast and strong"],
-              ["lag", 'Lag bolts 3/8" x 4"', "Heavy-duty bolted joinery"],
-              ["mortise", "Mortise + tenon", "Traditional joinery, requires more tools"],
-            ] as [Joinery, string, string][]
-          ).map(([j, label, sub]) => (
-            <label
-              key={j}
-              className={`flex cursor-pointer items-start gap-2 rounded border p-2 ${
-                form.joinery === j
-                  ? "border-stone-900 bg-stone-100"
-                  : "border-stone-200 hover:bg-stone-50"
-              }`}
-            >
-              <input
-                type="radio"
-                name="joinery"
-                checked={form.joinery === j}
-                onChange={() => setForm({ ...form, joinery: j })}
-                className="mt-1"
-              />
-              <div>
-                <div className="text-sm font-medium">{label}</div>
-                <div className="text-xs text-stone-500">{sub}</div>
-              </div>
-            </label>
+function SpecRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="font-medium">{value}</dd>
+    </div>
+  );
+}
+
+function DesignNotesCard({ config }: { config: BenchConfig }) {
+  const style = STYLE_PROFILES.find((s) => s.id === config.styleId)!;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Why this design works</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="ml-5 list-disc space-y-1 text-sm text-muted-foreground">
+          {style.designNotes.map((n, i) => (
+            <li key={i}>{n}</li>
           ))}
-        </div>
-      </details>
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
 
-      <details open>
-        <summary className="cursor-pointer list-none">
-          <h2 className="inline text-lg font-semibold">Add-ons</h2>
-        </summary>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <CheckField
-            label="Lower shelf"
-            checked={form.includeShelf}
-            onChange={(v) => setForm({ ...form, includeShelf: v })}
-          />
-          <NumField
-            label="Shelf height"
-            hint="from floor"
-            suffix={unitSuffix}
-            value={form.shelfHeight}
-            onChange={(v) => setForm({ ...form, shelfHeight: v })}
-            disabled={!form.includeShelf}
-          />
-          <CheckField
-            label="Center stretcher"
-            checked={form.middleStretcher}
-            onChange={(v) => setForm({ ...form, middleStretcher: v })}
-          />
-          <CheckField
-            label="Doubled-thick top"
-            checked={form.doubledTop}
-            onChange={(v) => setForm({ ...form, doubledTop: v })}
-          />
-          <CheckField
-            label="Casters (4)"
-            checked={form.casters}
-            onChange={(v) => setForm({ ...form, casters: v })}
-          />
-          <CheckField
-            label="Diagonal braces"
-            checked={form.diagonalBraces}
-            onChange={(v) => setForm({ ...form, diagonalBraces: v })}
-          />
-          <CheckField
-            label="Pegboard back"
-            checked={form.pegboard}
-            onChange={(v) => setForm({ ...form, pegboard: v })}
-          />
-          <NumField
-            label="Pegboard height"
-            suffix={unitSuffix}
-            value={form.pegboardHeight}
-            onChange={(v) => setForm({ ...form, pegboardHeight: v })}
-            disabled={!form.pegboard}
-          />
-          <CheckField
-            label="Tool well in top"
-            checked={form.toolWell}
-            onChange={(v) => setForm({ ...form, toolWell: v })}
-          />
-          <NumField
-            label="Tool well width"
-            suffix={unitSuffix}
-            value={form.toolWellWidth}
-            onChange={(v) => setForm({ ...form, toolWellWidth: v })}
-            disabled={!form.toolWell}
-          />
-          <CheckField
-            label="Edge band plywood top"
-            checked={form.edgeBand}
-            onChange={(v) => setForm({ ...form, edgeBand: v })}
-          />
-        </div>
-      </details>
+/* ====================================================================== */
+/*                          CUT PLAN TAB                                  */
+/* ====================================================================== */
 
-      <details>
-        <summary className="cursor-pointer list-none">
-          <h2 className="inline text-lg font-semibold">Finishing + saw</h2>
-        </summary>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <NumField
-            label="Finish coats"
-            value={form.finishCoats}
-            step={1}
-            onChange={(v) =>
-              setForm({ ...form, finishCoats: Math.max(0, Math.round(v)) })
-            }
-          />
-          <NumField
-            label="Saw kerf"
-            hint="blade thickness"
-            suffix={unitSuffix}
-            value={form.kerf}
-            step={unit === "in" ? 0.0625 : 0.1}
-            onChange={(v) => setForm({ ...form, kerf: v })}
-          />
-        </div>
-      </details>
+function CutPlanTab({ result, unit }: { result: CalcResult; unit: Unit }) {
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Cut list</CardTitle>
+          <CardDescription>{result.cutList.length} part types</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CutListTable rows={result.cutList} unit={unit} />
+        </CardContent>
+      </Card>
 
-      <div>
-        <button
-          type="button"
-          onClick={() => setForm(DEFAULTS_INCH)}
-          className="text-sm text-stone-600 underline hover:text-stone-900"
-        >
-          Reset to defaults
-        </button>
-      </div>
+      {result.lumberBoards.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Lumber cutting diagrams</CardTitle>
+            <CardDescription>
+              {result.lumberBoards.length} boards · {result.totals.lumberFt.toFixed(1)} linear ft
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {result.lumberBoards.map((b, i) => (
+              <LumberDiagram key={i} index={i} board={b} unit={unit} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {result.sheetLayouts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sheet cutting layouts</CardTitle>
+            <CardDescription>
+              {result.sheetLayouts.length} sheet{result.sheetLayouts.length === 1 ? "" : "s"} ({result.totals.sheetSqFt.toFixed(0)} sq ft)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {result.sheetLayouts.map((l, i) => (
+              <SheetDiagram key={i} index={i} layout={l} unit={unit} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </>
+  );
+}
+
+function CutListTable({ rows, unit }: { rows: CalcResult["cutList"]; unit: Unit }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-xs text-muted-foreground">
+            <th className="py-2 pr-3">#</th>
+            <th className="py-2 pr-3">Qty</th>
+            <th className="py-2 pr-3">Material</th>
+            <th className="py-2 pr-3">Dimensions</th>
+            <th className="py-2 pr-3">Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.partCode} className="border-b border-border/60 align-top">
+              <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground">{r.partCode}</td>
+              <td className="py-1.5 pr-3 font-semibold">{r.qty}</td>
+              <td className="py-1.5 pr-3">{r.materialLabel}</td>
+              <td className="py-1.5 pr-3 font-mono text-xs">
+                {formatLength(r.length, unit)}
+                {r.width !== undefined && ` × ${formatLength(r.width, unit)}`}
+                {r.thickness !== undefined && ` × ${formatLength(r.thickness, unit)}`}
+              </td>
+              <td className="py-1.5 pr-3 text-muted-foreground">{r.purpose}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*                          MATERIALS TAB                                 */
+/* ====================================================================== */
+
+function MaterialsTab({ result }: { result: CalcResult }) {
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Shopping list</CardTitle>
+          <CardDescription>
+            {result.hardware.length} items · est. ${result.totals.estimatedCost?.toFixed(0) ?? "—"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="py-2 pr-3">Qty</th>
+                  <th className="py-2 pr-3">Item</th>
+                  <th className="py-2 pr-3">Note</th>
+                  <th className="py-2 pr-3 text-right">Est. cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.hardware.map((h, i) => (
+                  <tr key={i} className="border-b border-border/60">
+                    <td className="py-1.5 pr-3 font-semibold">
+                      {h.qty}{h.unit ? ` ${h.unit}` : ""}
+                    </td>
+                    <td className="py-1.5 pr-3">{h.itemLabel}</td>
+                    <td className="py-1.5 pr-3 text-muted-foreground">{h.note ?? ""}</td>
+                    <td className="py-1.5 pr-3 text-right font-mono tabular-nums">
+                      {h.estimatedCost !== undefined ? `$${h.estimatedCost.toFixed(2)}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Tools you&apos;ll need</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid grid-cols-1 gap-y-1 text-sm sm:grid-cols-2">
+            {result.tools.map((t, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <Badge variant={t.required ? "default" : "outline"} className="shrink-0">
+                  {t.required ? "Req" : "Opt"}
+                </Badge>
+                <span>{t.name}</span>
+                {t.note && <span className="text-xs text-muted-foreground">— {t.note}</span>}
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </>
   );
 }
 
 /* ====================================================================== */
-/*                              Tab content                               */
+/*                          DIRECTIONS TAB                                */
 /* ====================================================================== */
 
-function OverviewTab({
-  result,
-  config,
-  legHeight,
-  unit,
-}: {
-  result: ReturnType<typeof calculate>;
-  config: BenchConfig;
-  legHeight: number;
-  unit: Unit;
-}) {
+function DirectionsTab({ result }: { result: CalcResult }) {
   return (
-    <div className="space-y-4">
-      <BenchIsoDiagram config={config} legHeight={legHeight} unit={unit} />
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          label="Lumber"
-          value={`${result.totals.lumberFt.toFixed(1)} ft`}
-        />
-        <Stat
-          label="Sheet goods"
-          value={`${result.totals.sheetSqFt.toFixed(1)} sq ft`}
-        />
-        <Stat
-          label="Finish surface"
-          value={`${result.totals.surfaceAreaSqFt.toFixed(0)} sq ft`}
-        />
-        <Stat
-          label="Approx. weight"
-          value={`${result.totals.weightLb.toFixed(0)} lb`}
-        />
-      </div>
-
-      <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold">Cut list</h2>
-        <CutListTable rows={result.cutList} unit={unit} />
-      </div>
-
-      <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-        <h3 className="font-semibold text-emerald-900">
-          Estimated total material cost
-        </h3>
-        <p className="mt-1 text-3xl font-bold text-emerald-900">
-          {result.totals.estimatedCost !== undefined
-            ? `$${result.totals.estimatedCost.toFixed(2)}`
-            : "—"}
-        </p>
-        <p className="mt-1 text-xs text-emerald-800">
-          Includes lumber + sheet goods + screws + glue + finish + sandpaper{" "}
-          {config.casters && "+ casters "} (rough averages — confirm at your store).
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function CutPlanTab({
-  result,
-  unit,
-}: {
-  result: ReturnType<typeof calculate>;
-  unit: Unit;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold">Cut list</h2>
-        <CutListTable rows={result.cutList} unit={unit} />
-      </div>
-
-      {result.lumberBoards.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-lg font-semibold">
-            Lumber cut diagrams — board by board
-          </h2>
-          <p className="mb-3 text-sm text-stone-600">
-            Each board is drawn to scale. Cut at the dashed lines (saw kerf). The
-            color-coded segments map to part codes in the cut list.
-          </p>
-          <div className="space-y-3">
-            {result.lumberBoards.map((b, i) => (
-              <LumberDiagram key={i} board={b} index={i} unit={unit} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {result.sheetLayouts.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-lg font-semibold">
-            Sheet cut layouts — full 4×8 sheets
-          </h2>
-          <p className="mb-3 text-sm text-stone-600">
-            Each sheet shown to scale. Cut on a sacrificial sheet of foam. Track
-            saw or circular saw + straight-edge gives the cleanest results.
-          </p>
-          <div className="space-y-3">
-            {result.sheetLayouts.map((l, i) => (
-              <SheetDiagram key={i} layout={l} index={i} unit={unit} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MaterialsTab({
-  result,
-  unit,
-}: {
-  result: ReturnType<typeof calculate>;
-  unit: Unit;
-}) {
-  void unit;
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold">Shopping list</h2>
-        <table className="w-full text-sm">
-          <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
-            <tr>
-              <th className="pb-2">Qty</th>
-              <th className="pb-2">Item</th>
-              <th className="pb-2">Notes</th>
-              <th className="pb-2 text-right">~Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.hardware.map((h, i) => (
-              <tr key={i} className="border-b border-stone-100 last:border-0">
-                <td className="py-2 font-medium">
-                  {h.qty}
-                  {h.unit ? ` ${h.unit}` : ""}
-                </td>
-                <td className="py-2">{h.itemLabel}</td>
-                <td className="py-2 text-xs text-stone-600">{h.note ?? ""}</td>
-                <td className="py-2 text-right font-mono text-xs">
-                  {h.estimatedCost !== undefined
-                    ? `$${h.estimatedCost.toFixed(2)}`
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-            <tr className="border-t-2 border-stone-300 font-semibold">
-              <td className="py-2"></td>
-              <td className="py-2">Total estimated</td>
-              <td></td>
-              <td className="py-2 text-right font-mono">
-                {result.totals.estimatedCost !== undefined
-                  ? `$${result.totals.estimatedCost.toFixed(2)}`
-                  : "—"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <p className="mt-3 text-xs text-stone-500">
-          Cost estimates are typical big-box pricing — verify at checkout. Hardware
-          counts include reasonable extras for dropped/stripped screws.
-        </p>
-      </div>
-
-      <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold">Tools required</h2>
-        <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-          {result.tools.map((t, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <span
-                className={`mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full ${
-                  t.required ? "bg-rose-500" : "bg-stone-400"
-                }`}
-                aria-label={t.required ? "required" : "optional"}
-              />
-              <span>
-                <span className={t.required ? "font-medium" : ""}>{t.name}</span>
-                {t.note && (
-                  <span className="text-xs text-stone-500"> — {t.note}</span>
-                )}
-                {!t.required && (
-                  <span className="text-xs italic text-stone-400"> (optional)</span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function DirectionsTab({
-  result,
-  unit,
-}: {
-  result: ReturnType<typeof calculate>;
-  unit: Unit;
-}) {
-  void unit;
-  return (
-    <div className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-3 text-lg font-semibold">Build directions</h2>
-      <ol className="space-y-4">
-        {result.steps.map((s) => (
-          <li
-            key={s.n}
-            className="rounded border border-stone-100 bg-stone-50 p-3"
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-stone-900 text-sm font-bold text-white">
+    <Card>
+      <CardHeader>
+        <CardTitle>Build directions</CardTitle>
+        <CardDescription>{result.steps.length} steps</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ol className="space-y-4">
+          {result.steps.map((s) => (
+            <li key={s.n} className="flex gap-4">
+              <Badge variant="outline" className="h-7 w-7 shrink-0 justify-center rounded-full font-mono text-sm">
                 {s.n}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold">{s.title}</h3>
-                <p className="mt-1 text-sm text-stone-700">{s.body}</p>
-                {(s.fasteners || s.tools) && (
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    {s.fasteners && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">
-                        {s.fasteners}
-                      </span>
-                    )}
-                    {s.tools?.map((t, i) => (
-                      <span
-                        key={i}
-                        className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-900"
-                      >
-                        {t}
-                      </span>
+              </Badge>
+              <div className="space-y-1">
+                <div className="font-semibold">{s.title}</div>
+                <div className="text-sm text-muted-foreground">{s.body}</div>
+                {s.fasteners && (
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Fasteners:</span> {s.fasteners}
+                  </div>
+                )}
+                {s.tools && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {s.tools.map((t, i) => (
+                      <Badge key={i} variant="secondary" className="text-[10px]">{t}</Badge>
                     ))}
                   </div>
                 )}
               </div>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-function PrintPreview({
-  result,
-  config,
-  legHeight,
-  unit,
-}: {
-  result: ReturnType<typeof calculate>;
-  config: BenchConfig;
-  legHeight: number;
-  unit: Unit;
-}) {
-  return (
-    <div className="space-y-6 bg-white p-6 text-stone-900">
-      <header className="border-b border-stone-300 pb-3">
-        <h1 className="text-2xl font-bold">Workbench Build Sheet</h1>
-        <p className="text-sm">
-          Top {formatLength(config.topLength, unit)} ×{" "}
-          {formatLength(config.topWidth, unit)} ×{" "}
-          {formatLength(config.totalHeight, unit)} H · Joinery:{" "}
-          <span className="font-medium">{config.joinery}</span>
-          {config.includeShelf && " · Shelf"}
-          {config.doubledTop && " · Doubled top"}
-          {config.casters && " · Casters"}
-          {config.pegboard && " · Pegboard"}
-          {config.toolWell && " · Tool well"}
-        </p>
-      </header>
-
-      <section className="print-avoid-break">
-        <BenchIsoDiagram config={config} legHeight={legHeight} unit={unit} />
-      </section>
-
-      <section className="print-avoid-break">
-        <h2 className="mb-2 text-lg font-bold">Cut list</h2>
-        <CutListTable rows={result.cutList} unit={unit} compact />
-      </section>
-
-      {result.lumberBoards.length > 0 && (
-        <section className="print-break">
-          <h2 className="mb-2 text-lg font-bold">Lumber cut diagrams</h2>
-          <div className="space-y-3">
-            {result.lumberBoards.map((b, i) => (
-              <div className="print-avoid-break" key={i}>
-                <LumberDiagram board={b} index={i} unit={unit} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {result.sheetLayouts.length > 0 && (
-        <section className="print-break">
-          <h2 className="mb-2 text-lg font-bold">Sheet cut layouts</h2>
-          <div className="space-y-3">
-            {result.sheetLayouts.map((l, i) => (
-              <div className="print-avoid-break" key={i}>
-                <SheetDiagram layout={l} index={i} unit={unit} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="print-break">
-        <h2 className="mb-2 text-lg font-bold">Shopping list</h2>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-stone-400 text-left text-xs uppercase">
-              <th className="pb-1">Qty</th>
-              <th className="pb-1">Item</th>
-              <th className="pb-1">Notes</th>
-              <th className="pb-1 text-right">~Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.hardware.map((h, i) => (
-              <tr key={i} className="border-b border-stone-200">
-                <td className="py-1">
-                  {h.qty}
-                  {h.unit ? ` ${h.unit}` : ""}
-                </td>
-                <td className="py-1">{h.itemLabel}</td>
-                <td className="py-1 text-xs">{h.note ?? ""}</td>
-                <td className="py-1 text-right font-mono text-xs">
-                  {h.estimatedCost !== undefined
-                    ? `$${h.estimatedCost.toFixed(2)}`
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-            <tr className="border-t-2 border-stone-500 font-bold">
-              <td className="py-1"></td>
-              <td className="py-1">Total estimated</td>
-              <td></td>
-              <td className="py-1 text-right font-mono">
-                {result.totals.estimatedCost !== undefined
-                  ? `$${result.totals.estimatedCost.toFixed(2)}`
-                  : "—"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section className="print-avoid-break">
-        <h2 className="mb-2 text-lg font-bold">Tools required</h2>
-        <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm">
-          {result.tools.map((t, i) => (
-            <li key={i}>
-              {t.required ? "●" : "○"} {t.name}
-              {t.note && <span className="text-stone-500"> — {t.note}</span>}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="print-break">
-        <h2 className="mb-2 text-lg font-bold">Build directions</h2>
-        <ol className="space-y-2">
-          {result.steps.map((s) => (
-            <li key={s.n} className="print-avoid-break border-l-2 border-stone-300 pl-3">
-              <div className="font-semibold">
-                {s.n}. {s.title}
-              </div>
-              <p className="text-sm">{s.body}</p>
-              {s.fasteners && (
-                <p className="text-xs italic text-stone-600">
-                  Fasteners: {s.fasteners}
-                </p>
-              )}
             </li>
           ))}
         </ol>
-      </section>
+      </CardContent>
+    </Card>
+  );
+}
 
-      {result.warnings.length > 0 && (
-        <section className="print-avoid-break border-t border-stone-300 pt-3">
-          <h2 className="text-sm font-bold">Notes / warnings</h2>
-          <ul className="list-disc pl-5 text-xs">
-            {result.warnings.map((w, i) => (
-              <li key={i}>{w}</li>
+/* ====================================================================== */
+/*                          PRINT PREVIEW                                 */
+/* ====================================================================== */
+
+function PrintPreview({
+  result, config, unit, sections,
+}: { result: CalcResult; config: BenchConfig; unit: Unit; sections: PrintSections }) {
+  const style = STYLE_PROFILES.find((s) => s.id === config.styleId)!;
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>{style.name}</CardTitle>
+          <CardDescription>
+            {formatLength(config.topLength, unit)} × {formatLength(config.topDepth, unit)} × {formatLength(config.totalHeight, unit)} — {style.useCase}
+          </CardDescription>
+        </CardHeader>
+        {sections.diagrams && (
+          <CardContent className="space-y-3">
+            <BenchIsoDiagram config={config} unit={unit} />
+            <ElevationViews config={config} unit={unit} />
+          </CardContent>
+        )}
+      </Card>
+
+      {sections.specs && <SpecCard config={config} result={result} unit={unit} />}
+
+      {sections.cutList && (
+        <Card className="print-avoid-break">
+          <CardHeader><CardTitle>Cut list</CardTitle></CardHeader>
+          <CardContent><CutListTable rows={result.cutList} unit={unit} /></CardContent>
+        </Card>
+      )}
+
+      {sections.lumberDiagrams && result.lumberBoards.length > 0 && (
+        <Card className="print-break">
+          <CardHeader>
+            <CardTitle>Lumber cutting diagrams</CardTitle>
+            <CardDescription>
+              {result.lumberBoards.length} boards · {result.totals.lumberFt.toFixed(1)} linear ft
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {result.lumberBoards.map((b, i) => (
+              <LumberDiagram key={i} index={i} board={b} unit={unit} />
             ))}
-          </ul>
-        </section>
+          </CardContent>
+        </Card>
+      )}
+
+      {sections.sheetLayouts && result.sheetLayouts.length > 0 && (
+        <Card className="print-avoid-break">
+          <CardHeader>
+            <CardTitle>Sheet cutting layouts</CardTitle>
+            <CardDescription>
+              {result.sheetLayouts.length} sheet{result.sheetLayouts.length === 1 ? "" : "s"} ({result.totals.sheetSqFt.toFixed(0)} sq ft)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {result.sheetLayouts.map((l, i) => (
+              <SheetDiagram key={i} index={i} layout={l} unit={unit} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {sections.materials && (
+        <div className="print-break">
+          <MaterialsTab result={result} />
+        </div>
+      )}
+
+      {sections.directions && (
+        <div className="print-break">
+          <DirectionsTab result={result} />
+        </div>
       )}
     </div>
   );
 }
 
-/* ====================================================================== */
-/*                              Sub-pieces                                */
-/* ====================================================================== */
-
-function CutListTable({
-  rows,
-  unit,
-  compact = false,
-}: {
-  rows: ReturnType<typeof calculate>["cutList"];
-  unit: Unit;
-  compact?: boolean;
-}) {
-  if (rows.length === 0) {
-    return (
-      <p className="text-sm text-stone-500">
-        No cuts — adjust the inputs to see results.
-      </p>
+function PrintMenu({
+  sections, setSections,
+}: { sections: PrintSections; setSections: (s: PrintSections) => void }) {
+  const toggle = (key: keyof PrintSections) =>
+    setSections({ ...sections, [key]: !sections[key] });
+  const allOn = PRINT_SECTION_LABELS.every(({ key }) => sections[key]);
+  const setAll = (value: boolean) =>
+    setSections(
+      PRINT_SECTION_LABELS.reduce(
+        (acc, { key }) => ({ ...acc, [key]: value }),
+        {} as PrintSections,
+      ),
     );
-  }
+
   return (
-    <table className="w-full text-sm">
-      <thead className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
-        <tr>
-          <th className={compact ? "pb-1" : "pb-2"}>Part</th>
-          <th className={compact ? "pb-1" : "pb-2"}>Qty</th>
-          <th className={compact ? "pb-1" : "pb-2"}>Material</th>
-          <th className={compact ? "pb-1" : "pb-2"}>Dimensions</th>
-          <th className={compact ? "pb-1" : "pb-2"}>Purpose</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, i) => (
-          <tr key={i} className="border-b border-stone-100 last:border-0">
-            <td className={`${compact ? "py-1" : "py-2"} font-mono font-semibold`}>
-              {row.partCode}
-            </td>
-            <td className={`${compact ? "py-1" : "py-2"} font-medium`}>{row.qty}</td>
-            <td className={compact ? "py-1" : "py-2"}>{row.materialLabel}</td>
-            <td className={`${compact ? "py-1" : "py-2"} font-mono text-xs`}>
-              {formatLength(row.length, unit)}
-              {row.width !== undefined && ` × ${formatLength(row.width, unit)}`}
-              {row.thickness !== undefined && ` × ${formatLength(row.thickness, unit)} thk`}
-            </td>
-            <td className={`${compact ? "py-1" : "py-2"} text-stone-600`}>
-              {row.purpose}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="default" className="gap-1.5">
+          <Printer className="size-4" />
+          Print
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Sections to print</div>
+            <button
+              type="button"
+              onClick={() => setAll(!allOn)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              {allOn ? "Clear all" : "Select all"}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {PRINT_SECTION_LABELS.map(({ key, label }) => (
+              <Label
+                key={key}
+                className="flex cursor-pointer items-center gap-2 text-sm font-normal"
+              >
+                <Checkbox
+                  checked={sections[key]}
+                  onCheckedChange={() => toggle(key)}
+                />
+                <span>{label}</span>
+              </Label>
+            ))}
+          </div>
+          <Button
+            className="w-full gap-1.5"
+            onClick={() => window.print()}
+          >
+            <Printer className="size-4" />
+            Print
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/* ====================================================================== */
+/*                              HELPERS                                   */
+/* ====================================================================== */
+
+function UnitToggle({
+  value, onChange,
+}: { value: Unit; onChange: (u: Unit) => void }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-3 text-center shadow-sm">
-      <div className="text-xs uppercase tracking-wide text-stone-500">{label}</div>
-      <div className="text-xl font-bold">{value}</div>
+    <div className="inline-flex overflow-hidden rounded-md border border-input bg-card">
+      {(["in", "mm"] as const).map((u) => (
+        <button
+          key={u}
+          type="button"
+          onClick={() => onChange(u)}
+          className={`px-3 py-1.5 text-xs font-medium ${
+            value === u
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted"
+          }`}
+        >
+          {u}
+        </button>
+      ))}
     </div>
   );
 }
 
-function NumField({
-  label,
-  hint,
-  suffix,
-  value,
-  onChange,
-  step = 0.25,
-  disabled = false,
-}: {
-  label: string;
-  hint?: string;
-  suffix?: string;
-  value: number;
-  onChange: (v: number) => void;
-  step?: number;
-  disabled?: boolean;
-}) {
-  return (
-    <label className={`block ${disabled ? "opacity-40" : ""}`}>
-      <span className="block text-xs font-medium text-stone-700">
-        {label}{" "}
-        {hint && <span className="font-normal text-stone-500">— {hint}</span>}
-      </span>
-      <div className="mt-1 flex items-center rounded border border-stone-300 bg-white focus-within:border-stone-500">
-        <input
-          type="number"
-          value={Number.isFinite(value) ? value : 0}
-          step={step}
-          disabled={disabled}
-          onChange={(e) => {
-            const v = e.target.value === "" ? 0 : Number(e.target.value);
-            onChange(Number.isFinite(v) ? v : 0);
-          }}
-          className="w-full bg-transparent px-2 py-1.5 text-sm outline-none disabled:cursor-not-allowed"
-        />
-        {suffix && <span className="px-2 text-xs text-stone-500">{suffix}</span>}
-      </div>
-    </label>
-  );
+function formFromInputs(input: SimpleInputs): FormState {
+  const style = STYLE_PROFILES.find((s) => s.id === input.styleId);
+  return {
+    styleId: input.styleId,
+    topLength: input.topLength,
+    topDepth: input.topDepth,
+    totalHeight: input.totalHeight,
+    casters: input.casters ?? false,
+    pegboard: input.pegboard ?? false,
+    pegboardHeight: input.pegboardHeight ?? 24,
+    viseOverride: input.viseOverride,
+    joineryOverride: input.joineryOverride,
+    drawerCount: input.drawerCount ?? style?.defaultDrawerCount ?? 0,
+    drawerLocation: input.drawerLocation ?? style?.defaultDrawerLocation ?? "under-top",
+    drawerSlideType: input.drawerSlideType ?? style?.defaultDrawerSlideType ?? "metal",
+  };
 }
 
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-  disabled = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  disabled?: boolean;
-}) {
-  return (
-    <label className={`block ${disabled ? "opacity-40" : ""}`}>
-      <span className="block text-xs font-medium text-stone-700">{label}</span>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-stone-500 focus:outline-none disabled:cursor-not-allowed"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+function topDescription(c: BenchConfig): string {
+  switch (c.topConstruction) {
+    case "single-sheet":
+      return `single ${c.topMaterialId.replace("_", " ")}`;
+    case "doubled-sheet":
+      return `doubled ${c.topMaterialId.replace("_", " ")}`;
+    case "laminated-2x":
+      return `${c.topLamCount} × ${c.topMaterialId} laminated`;
+    case "slab":
+      return `${c.topSlabThickness}" laminated slab`;
+  }
 }
 
-function CheckField({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2 self-end pb-1.5 text-sm">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-stone-300"
-      />
-      <span>{label}</span>
-    </label>
-  );
+function prettyVise(v: ViseKind): string {
+  return {
+    "none": "no vise",
+    "front-face-vise": "front face vise",
+    "leg-vise": "leg vise",
+    "tail-vise": "tail vise",
+    "quick-release-9in": 'quick-release 9"',
+    "pipe-clamp-vise": "pipe-clamp vise",
+  }[v];
 }
 
-function round(n: number) {
-  return Math.round(n * 100) / 100;
-}
-function roundFine(n: number) {
-  return Math.round(n * 10000) / 10000;
+function roundUI(v: number) {
+  return Math.round(v * 4) / 4;
 }

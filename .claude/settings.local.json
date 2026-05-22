@@ -5,7 +5,8 @@
       "WebFetch(domain:create.t3.gg)",
       "WebFetch(domain:securityonline.info)",
       "WebFetch(domain:unit42.paloaltonetworks.com)",
-      "Bash(bun pm *)"
+      "Bash(bun pm *)",
+      "Bash(node node_modules/oxlint/bin/oxlint --version)"
     ]
   }
 }

@@ -1,5 +1,6 @@
 import type { SheetLayoutOut } from "~/lib/types";
 import { formatLength, type Unit } from "~/lib/units";
+import { Card } from "~/components/ui/card";
 
 type Props = {
   layout: SheetLayoutOut;
@@ -23,18 +24,18 @@ export function SheetDiagram({ layout, index, unit }: Props) {
   const scale = viewW / layout.sheetW;
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
+    <Card className="p-3">
       <div className="mb-1 flex items-center justify-between">
         <div className="text-sm font-semibold">
-          Sheet {index + 1} — {layout.materialLabel} ({layout.sheetW}"×
-          {layout.sheetH}")
+          Sheet {index + 1} — {layout.materialLabel} ({layout.sheetW}&quot;×
+          {layout.sheetH}&quot;)
         </div>
-        <div className="text-xs text-stone-500">waste: {wastePct.toFixed(0)}%</div>
+        <div className="text-xs text-muted-foreground">waste: {wastePct.toFixed(0)}%</div>
       </div>
 
       <svg
         viewBox={`0 0 ${viewW + pad * 2} ${viewH + pad * 2 + 20}`}
-        className="w-full"
+        className="w-full text-foreground"
         role="img"
         aria-label={`Sheet layout ${index + 1}`}
       >
@@ -45,8 +46,9 @@ export function SheetDiagram({ layout, index, unit }: Props) {
             y={0}
             width={viewW}
             height={viewH}
-            fill="#fafaf9"
-            stroke="#57534e"
+            className="fill-muted"
+            stroke="currentColor"
+            strokeOpacity={0.6}
             strokeWidth={1.5}
           />
 
@@ -58,7 +60,8 @@ export function SheetDiagram({ layout, index, unit }: Props) {
               x2={i * 12 * scale}
               y1={0}
               y2={viewH}
-              stroke="#e7e5e4"
+              stroke="currentColor"
+              strokeOpacity={0.15}
               strokeWidth={0.5}
             />
           ))}
@@ -69,7 +72,8 @@ export function SheetDiagram({ layout, index, unit }: Props) {
               x2={viewW}
               y1={i * 12 * scale}
               y2={i * 12 * scale}
-              stroke="#e7e5e4"
+              stroke="currentColor"
+              strokeOpacity={0.15}
               strokeWidth={0.5}
             />
           ))}
@@ -127,14 +131,14 @@ export function SheetDiagram({ layout, index, unit }: Props) {
             x={viewW / 2}
             y={viewH + 14}
             textAnchor="middle"
-            className="fill-stone-600 text-[10px]"
+            className="fill-muted-foreground text-[10px]"
           >
             {formatLength(layout.sheetW, unit)} ←
           </text>
         </g>
       </svg>
 
-      <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-stone-700">
+      <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-foreground">
         {layout.pieces.map((p, i) => (
           <li key={i}>
             <span className="font-mono font-semibold">{p.partCode}</span> —{" "}
@@ -142,6 +146,6 @@ export function SheetDiagram({ layout, index, unit }: Props) {
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }

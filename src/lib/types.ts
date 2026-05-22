@@ -1,34 +1,107 @@
 // Shared types for calculator output and config.
 
+import type {
+  BenchStyleId,
+  DrawerLocation,
+  DrawerSlideType,
+  StretcherLayout,
+  TopConstruction,
+  TopLamOrientation,
+  ViseKind,
+} from "./styles";
+
 export type Joinery = "pocket" | "lag" | "mortise";
 
 export type StockLengthPreference = number | "any";
 
-export type BenchConfig = {
-  // All dimensions in inches internally
+// Stuff the user actually sets through the UI. Everything else is derived
+// from the chosen style profile + these three dimensions.
+export type SimpleInputs = {
+  styleId: BenchStyleId;
   topLength: number;
-  topWidth: number;
+  topDepth: number;
   totalHeight: number;
-  overhang: number;
-  shelfHeight: number;
+  // Optional overrides (advanced toggles):
+  casters?: boolean;
+  pegboard?: boolean;
+  pegboardHeight?: number;
+  edgeBand?: boolean;
+  finishCoats?: number;
+  customLumberPricePerFt?: number;
+  stockLengthPreference?: StockLengthPreference;
+  joineryOverride?: Joinery;
+  viseOverride?: ViseKind;
+  kerf?: number; // defaults to 0.125
+  // Drawer overrides (any field provided overrides the style default):
+  drawerCount?: number;
+  drawerLocation?: DrawerLocation;
+  drawerSlideType?: DrawerSlideType;
+};
+
+// Full derived bench configuration consumed by the calculator. Most callers
+// produce this via deriveBenchConfig(simple). It is also returned in the
+// build sheet so the user can see what the style chose for them.
+export type BenchConfig = {
+  styleId: BenchStyleId;
+
+  // dimensions (inches)
+  topLength: number;
+  topDepth: number;
+  totalHeight: number;
+  overhangFront: number;
+  overhangSide: number;
   kerf: number;
+
+  // materials
   legMaterialId: string;
   apronMaterialId: string;
+  stretcherMaterialId: string;
   topMaterialId: string;
   shelfMaterialId: string;
   pegboardMaterialId: string;
-  includeShelf: boolean;
-  middleStretcher: boolean;
-  doubledTop: boolean;
+
+  // top construction
+  topConstruction: TopConstruction;
+  topLamCount: number; // number of boards laminated for laminated-2x tops
+  topLamOrientation: TopLamOrientation; // flat-edge / face-glue / on-edge
+  topSlabThickness: number; // thickness for "slab" tops (in)
+  topSheetLayers: number; // 1 or 2 (for sheet tops)
+
+  // stretchers / shelf / bracing
+  stretchers: StretcherLayout;
+
+  // joinery + style features
+  joinery: Joinery;
+  // Aprons run past the outside leg faces (Nicholson, 2x4-basics) vs inset
+  // between them. Affects part length and corner joinery.
+  apronsOverlapLegs: boolean;
+  stretchersOverlapLegs: boolean;
+  // Tenon length per joint (only used when joinery === "mortise" and the
+  // part is INSET between legs, not overlapping them).
+  tenonLength: number;
+  legSplayDeg: number;
+  knockdown: boolean;
+  vise: ViseKind;
+  dogHoles: boolean;
+  dogHoleSpacing: number;
+
+  // accessories
   casters: boolean;
   pegboard: boolean;
   pegboardHeight: number;
   toolWell: boolean;
   toolWellWidth: number;
-  diagonalBraces: boolean;
+
+  // drawers (0 = no drawers)
+  drawerCount: number;
+  drawerLocation: DrawerLocation;
+  drawerSlideType: DrawerSlideType;
+
+  // finishing
   edgeBand: boolean;
   finishCoats: number;
-  joinery: Joinery;
+
+  // pricing / stock
   stockLengthPreference: StockLengthPreference;
   customLumberPricePerFt?: number;
 };
@@ -95,6 +168,27 @@ export type CalcTotals = {
   weightLb: number;
 };
 
+export type StabilityVerdict = "solid" | "acceptable" | "marginal" | "unstable";
+
+export type StabilityReport = {
+  verdict: StabilityVerdict;
+  score: number; // 0 - 100
+  // Beam deflection of the top under a 200 lb point load at center of the
+  // longest unsupported apron span (inches):
+  topSagInches: number;
+  topSagLimitInches: number; // suggested max (typically L/240)
+  // Approximate lateral force at top edge required to rack the base 1°
+  // (lower = easier to rack = less stable). In pounds-force:
+  rackingResistanceLbf: number;
+  // Footprint width vs CoG height ratio. Higher = harder to tip:
+  tipRatio: number;
+  // Estimated bench weight. Heavier base = better hand-tool work:
+  baseWeightLb: number;
+  // Plain-English findings:
+  notes: string[];
+  warnings: string[];
+};
+
 export type CalcResult = {
   cutList: CutListItem[];
   lumberBoards: LumberBoardOut[];
@@ -103,5 +197,9 @@ export type CalcResult = {
   tools: ToolItem[];
   steps: AssemblyStep[];
   warnings: string[];
+  stability: StabilityReport;
   totals: CalcTotals;
+  // Echo of the derived structural config so the UI can show the user what
+  // their style choice "picked" for them:
+  derived: BenchConfig;
 };
