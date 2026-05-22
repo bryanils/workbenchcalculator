@@ -52,6 +52,7 @@ export function deriveBenchConfig(input: SimpleInputs): BenchConfig {
     overhangFront: style.overhangFront,
     overhangSide: style.overhangSide,
     kerf: input.kerf ?? 0.125,
+    benchCount: Math.max(1, Math.min(20, Math.floor(input.benchCount ?? 1))),
 
     legMaterialId,
     apronMaterialId: style.apronMaterialId,

@@ -32,6 +32,9 @@ export type SimpleInputs = {
   joineryOverride?: Joinery;
   viseOverride?: ViseKind;
   kerf?: number; // defaults to 0.125
+  // How many identical benches to build at once. Pieces are pooled across
+  // benches so the sheet/lumber packer can tile them jointly for better yield.
+  benchCount?: number; // defaults to 1
   // Drawer overrides (any field provided overrides the style default):
   drawerCount?: number;
   drawerLocation?: DrawerLocation;
@@ -51,6 +54,7 @@ export type BenchConfig = {
   overhangFront: number;
   overhangSide: number;
   kerf: number;
+  benchCount: number;
 
   // materials
   legMaterialId: string;

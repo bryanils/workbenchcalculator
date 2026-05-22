@@ -105,6 +105,7 @@ type FormState = {
   drawerCount: number;
   drawerLocation: "under-top" | "below-shelf";
   drawerSlideType: "metal" | "wooden";
+  benchCount: number;
 };
 
 function buildInputs(form: FormState, unit: Unit): SimpleInputs {
@@ -121,6 +122,7 @@ function buildInputs(form: FormState, unit: Unit): SimpleInputs {
     drawerCount: form.drawerCount,
     drawerLocation: form.drawerLocation,
     drawerSlideType: form.drawerSlideType,
+    benchCount: form.benchCount,
   };
 }
 
@@ -167,6 +169,7 @@ export default function Home() {
       drawerCount: s.defaultDrawerCount ?? 0,
       drawerLocation: s.defaultDrawerLocation ?? "under-top",
       drawerSlideType: s.defaultDrawerSlideType ?? "metal",
+      benchCount: form.benchCount,
     });
   };
 
@@ -417,6 +420,17 @@ function SidebarInputs({
           <DimField label="Height" hint={`${conv(hMin)}-${conv(hMax)}${u}`} suffix={u} step={unit === "in" ? 0.25 : 1}
             value={form.totalHeight} onChange={(v) => setForm({ ...form, totalHeight: v })} />
         </div>
+
+        <DimField
+          label="How many to build"
+          hint="Pieces are pooled across benches so sheet & lumber tile jointly for less waste"
+          suffix="benches"
+          step={1}
+          value={form.benchCount}
+          onChange={(v) =>
+            setForm({ ...form, benchCount: Math.max(1, Math.min(20, Math.floor(v || 1))) })
+          }
+        />
 
         <Separator />
 
@@ -1261,6 +1275,7 @@ function formFromInputs(input: SimpleInputs): FormState {
     drawerCount: input.drawerCount ?? style?.defaultDrawerCount ?? 0,
     drawerLocation: input.drawerLocation ?? style?.defaultDrawerLocation ?? "under-top",
     drawerSlideType: input.drawerSlideType ?? style?.defaultDrawerSlideType ?? "metal",
+    benchCount: Math.max(1, Math.min(20, Math.floor(input.benchCount ?? 1))),
   };
 }
 

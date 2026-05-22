@@ -388,6 +388,16 @@ export function calculate(config: BenchConfig): CalcResult {
   }
 
   // ======================================================================
+  // Scale to bench count — pool every bench's pieces into one cut list so
+  // the lumber and sheet packers can tile across benches jointly. Doing
+  // this here (rather than at each cutList.push) keeps the per-bench
+  // geometry code untouched.
+  // ======================================================================
+  if (config.benchCount > 1) {
+    for (const item of cutList) item.qty *= config.benchCount;
+  }
+
+  // ======================================================================
   // Pack lumber per material into stock boards
   // ======================================================================
   const lumberBoards: LumberBoardOut[] = [];
@@ -674,6 +684,15 @@ export function calculate(config: BenchConfig): CalcResult {
       note: `Bore 3/4" holes at ${config.dogHoleSpacing}" on center along the front edge of the top`,
       estimatedCost: count * 3.25,
     });
+  }
+
+  // Scale hardware to bench count. Tools intentionally NOT scaled — you don't
+  // need a second drill to build a second bench.
+  if (config.benchCount > 1) {
+    for (const h of hardware) {
+      h.qty *= config.benchCount;
+      if (h.estimatedCost !== undefined) h.estimatedCost *= config.benchCount;
+    }
   }
 
   // ======================================================================
