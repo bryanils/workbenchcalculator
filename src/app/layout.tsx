@@ -3,6 +3,8 @@ import { Geist } from "next/font/google";
 
 import { SiteHeader } from "~/components/SiteHeader";
 import { ThemeProvider } from "~/components/providers/ThemeProvider";
+import { Toaster } from "~/components/ui/sonner";
+import { TooltipProvider } from "~/components/ui/tooltip";
 import { TRPCReactProvider } from "~/trpc/react";
 
 import "~/styles/globals.css";
@@ -33,10 +35,12 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <TRPCReactProvider>
-            <div className={`${geist.variable} flex h-screen flex-col overflow-hidden font-sans`}>
-              <SiteHeader />
-              <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-            </div>
+            <TooltipProvider delayDuration={150}>
+              <div className={`${geist.variable} flex h-screen flex-col overflow-hidden font-sans`}>
+                <SiteHeader />
+                <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+              </div>
+            </TooltipProvider>
           </TRPCReactProvider>
         </ThemeProvider>
       </body>
