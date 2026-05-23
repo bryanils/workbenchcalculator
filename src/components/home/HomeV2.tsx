@@ -254,7 +254,7 @@ export default function HomeV2() {
         </aside>
 
         {/* RIGHT: workflow tabs */}
-        <section className="flex min-h-0 flex-1 flex-col">
+        <section className="@container flex min-h-0 flex-1 flex-col">
           <Tabs
             defaultValue="design"
             className="no-print flex min-h-0 flex-1 flex-col gap-3"
@@ -341,10 +341,10 @@ function SpecStrip({
   cost?: number;
 }) {
   const verdictMap = {
-    solid: { label: "Solid", tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" },
-    acceptable: { label: "Acceptable", tone: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" },
-    marginal: { label: "Marginal", tone: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30" },
-    unstable: { label: "Unstable", tone: "bg-destructive/15 text-destructive border-destructive/30" },
+    solid: { label: "Solid", tone: "border-success/30 bg-success/15 text-success" },
+    acceptable: { label: "Acceptable", tone: "border-accent/40 bg-accent/15 text-accent-foreground" },
+    marginal: { label: "Marginal", tone: "border-warning/30 bg-warning/15 text-warning" },
+    unstable: { label: "Unstable", tone: "border-destructive/30 bg-destructive/15 text-destructive" },
   }[verdict];
 
   const lenIn = toInches(form.topLength, unit);
@@ -458,7 +458,7 @@ function DesignTab({
           <CardDescription>Picks every structural choice. Click to swap.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 @xs:grid-cols-2 @lg:grid-cols-3 @3xl:grid-cols-4">
             {STYLE_PROFILES.map((s) => {
               const active = s.id === form.styleId;
               return (
@@ -575,7 +575,7 @@ function DesignTab({
             </Select>
           </div>
           {form.drawerCount > 0 && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Location</Label>
                 <Select
@@ -746,14 +746,17 @@ function LibraryPopover({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <Tabs defaultValue="saved" className="w-full">
-          <TabsList className="w-full">
+      <PopoverContent
+        align="end"
+        className="w-[22rem] max-w-[calc(100vw-1rem)] p-0"
+      >
+        <Tabs defaultValue="saved" className="flex w-full flex-col">
+          <TabsList className="m-2 mb-0">
             <TabsTrigger value="saved" className="flex-1">Saved</TabsTrigger>
             <TabsTrigger value="presets" className="flex-1">Built-in plans</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="saved" className="space-y-3 p-3">
+          <TabsContent value="saved" className="m-0 flex flex-col gap-3 p-3">
             <div className="flex gap-2">
               <Input
                 value={designName}
@@ -767,12 +770,12 @@ function LibraryPopover({
             </div>
 
             {designs.length > 0 ? (
-              <ScrollArea className="max-h-56">
-                <div className="space-y-1 pr-2">
+              <ScrollArea className="h-56 rounded-md border border-border">
+                <div className="space-y-1 p-2">
                   {designs.map((d) => (
                     <div
                       key={d.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-sm"
+                      className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-2 py-1.5 text-sm"
                     >
                       <button
                         type="button"
@@ -784,10 +787,10 @@ function LibraryPopover({
                       </button>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         aria-label={`Delete ${d.name}`}
                         onClick={() => onDelete(d.id)}
-                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        className="size-6 shrink-0 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -796,7 +799,7 @@ function LibraryPopover({
                 </div>
               </ScrollArea>
             ) : (
-              <div className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+              <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
                 No saved designs yet.
               </div>
             )}
@@ -831,17 +834,17 @@ function LibraryPopover({
             </div>
           </TabsContent>
 
-          <TabsContent value="presets" className="p-3">
-            <ScrollArea className="max-h-72">
-              <div className="space-y-1 pr-2">
+          <TabsContent value="presets" className="m-0 p-3">
+            <ScrollArea className="h-72 rounded-md border border-border">
+              <div className="space-y-1 p-2">
                 {PRESETS.map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => onLoadPreset(p.id)}
-                    className="block w-full rounded-md border border-border bg-card px-2 py-1.5 text-left text-sm hover:border-foreground/30 hover:bg-muted/30"
+                    className="block w-full rounded-md border border-border bg-card px-2 py-1.5 text-left text-sm transition hover:border-primary/40 hover:bg-accent/30"
                   >
-                    <div className="font-medium">{p.name}</div>
+                    <div className="truncate font-medium">{p.name}</div>
                     <div className="line-clamp-1 text-[11px] text-muted-foreground">
                       {p.description}
                     </div>
