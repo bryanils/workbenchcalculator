@@ -16,9 +16,13 @@ export type BenchStyleId =
   | "moravian-knockdown"
   | "garage-2x4-basics"
   | "mobile-assembly-cart"
-  | "tablesaw-outfeed"
-  | "kid-bench"
-  | "metalwork-bench";
+  | "kid-bench";
+
+// How the base comes apart (or doesn't):
+// - "bolted":    metal cap screws into ductile mounting plates (Schwarz Nicholson)
+// - "wedged":    hardwood wedges through tusk tenons, no metal (Moravian)
+// - "barrel-nut": cross-dowel barrel nuts pulled by hex bolts (Benchcrafted Roubo long rails)
+export type KnockdownHardwareKind = "bolted" | "wedged" | "barrel-nut";
 
 export type TopConstruction =
   | "single-sheet" // one sheet of ply / MDF
@@ -98,6 +102,9 @@ export type StyleProfile = {
   legSplayDeg: number;
   // Knockdown bolts vs glue-up:
   knockdown: boolean;
+  // What kind of knockdown hardware (only consulted when knockdown===true OR
+  // the style ships with a barrel-nut kit even if it isn't fully knockdown).
+  knockdownHardwareKind?: KnockdownHardwareKind;
   // Defaults for the rest of the form (user can override in advanced):
   joinery: Joinery;
   // True for Nicholson / 2x4 carriage-bolt benches where the apron runs
@@ -201,7 +208,8 @@ export const STYLE_PROFILES: StyleProfile[] = [
     },
     legSplayDeg: 0,
     knockdown: true,
-    joinery: "lag", // 3/8" threaded rod / cap screws — modeled as lag bolts
+    knockdownHardwareKind: "bolted",
+    joinery: "lag", // 3/8"-16 cap screws into ductile plates — modeled as lag joinery
     apronsOverlapLegs: true,
     stretchersOverlapLegs: true,
     vise: "leg-vise",
@@ -244,6 +252,10 @@ export const STYLE_PROFILES: StyleProfile[] = [
     },
     legSplayDeg: 0,
     knockdown: false,
+    // Benchcrafted Split-Top Roubo: long rails are knockdown via barrel nuts;
+    // short rails are permanent drawbored M&T. We surface the barrel-nut kit
+    // even though `knockdown` is false because the parts list still needs it.
+    knockdownHardwareKind: "barrel-nut",
     joinery: "mortise",
     tenonLength: 1.5, // 1-1/2" wedged through-tenons typical for Roubo
     vise: "leg-vise",
@@ -289,6 +301,7 @@ export const STYLE_PROFILES: StyleProfile[] = [
     },
     legSplayDeg: 16,
     knockdown: true,
+    knockdownHardwareKind: "wedged",
     joinery: "mortise",
     tenonLength: 1.5, // wedged through-tenons / tusk tenons
     vise: "leg-vise",
@@ -387,46 +400,6 @@ export const STYLE_PROFILES: StyleProfile[] = [
     ],
   },
   {
-    id: "tablesaw-outfeed",
-    name: "Table-Saw Outfeed Table",
-    blurb:
-      'Low-profile outfeed table that doubles as an assembly bench. Top set 1/16" below saw deck height. No shelf so cutoffs can fall through.',
-    useCase: "Behind a contractor or cabinet saw. Match height to your saw deck.",
-    defaultLength: 60,
-    defaultDepth: 32,
-    defaultHeight: 34, // user should set to match their saw
-    lengthRange: [48, 96],
-    depthRange: [24, 36],
-    heightRange: [32, 38],
-    legMaterialId: "4x4",
-    apronMaterialId: "2x4",
-    stretcherMaterialId: "2x4",
-    topConstruction: "doubled-sheet",
-    topMaterialId: "mdf_3_4", // slick surface
-    overhangFront: 0.5,
-    overhangSide: 0.5,
-    stretchers: {
-      floorStretchers: true,
-      floorStretcherHeight: 8,
-      centerStretcher: true,
-      lowerShelf: false,
-      shelfHeight: 0,
-      diagonalBraces: false,
-    },
-    legSplayDeg: 0,
-    knockdown: false,
-    joinery: "pocket",
-    vise: "none",
-    dogHoles: false,
-    dogHoleSpacing: 6,
-    casters: true,
-    designNotes: [
-      "MDF top is intentional: smooth and slick so workpieces glide off the saw without catching.",
-      'Set total height to your saw deck height MINUS 1/16" so material always falls off the saw, never catches.',
-      "No lower shelf so dust and offcuts can fall to the floor instead of piling up.",
-    ],
-  },
-  {
     id: "kid-bench",
     name: "Kid-Sized Workbench",
     blurb:
@@ -466,49 +439,6 @@ export const STYLE_PROFILES: StyleProfile[] = [
     designNotes: [
       "Floor stretchers and shelf are non-negotiable on a small bench — short benches racked badly without them.",
       "All edges should be eased with a 1/8\" roundover before finishing.",
-    ],
-  },
-  {
-    id: "metalwork-bench",
-    name: "Metalwork / Welder's Bench",
-    blurb:
-      "Steel-friendly: 4x4 posts, 2x6 aprons, no overhang, thick top. Made to take clamping, pounding, and the occasional brief weld spark (cover top with a sacrificial sheet for actual welding).",
-    useCase: "Wrenching, grinding, light fab. NOT a substitute for an all-steel welding table.",
-    defaultLength: 60,
-    defaultDepth: 30,
-    defaultHeight: 36,
-    lengthRange: [48, 84],
-    depthRange: [24, 36],
-    heightRange: [34, 40],
-    legMaterialId: "4x4",
-    apronMaterialId: "2x6",
-    stretcherMaterialId: "2x6",
-    topConstruction: "doubled-sheet",
-    topMaterialId: "ply_3_4",
-    overhangFront: 0,
-    overhangSide: 0,
-    stretchers: {
-      floorStretchers: true,
-      floorStretcherHeight: 6,
-      centerStretcher: true,
-      lowerShelf: true,
-      shelfHeight: 11,
-      diagonalBraces: false,
-    },
-    legSplayDeg: 0,
-    knockdown: false,
-    joinery: "lag",
-    vise: "front-face-vise",
-    dogHoles: false,
-    dogHoleSpacing: 6,
-    casters: false,
-    defaultDrawerCount: 2,
-    defaultDrawerLocation: "below-shelf",
-    defaultDrawerSlideType: "metal",
-    designNotes: [
-      "Zero overhang front and side means clamps can grab every edge.",
-      'Plan on covering the top with a 1/4" steel plate (or sacrificial 1/2" ply sheet you replace) for any actual welding or grinding.',
-      "2x6 aprons + 2x6 floor stretchers form a rigid box that won't twist when you crank a bench vise.",
     ],
   },
 ];

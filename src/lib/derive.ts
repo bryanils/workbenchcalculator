@@ -79,6 +79,7 @@ export function deriveBenchConfig(input: SimpleInputs): BenchConfig {
     tenonLength: style.tenonLength ?? 0,
     legSplayDeg: style.legSplayDeg,
     knockdown: style.knockdown,
+    knockdownHardwareKind: style.knockdownHardwareKind,
     vise: input.viseOverride ?? style.vise,
     dogHoles: style.dogHoles,
     dogHoleSpacing: style.dogHoleSpacing,

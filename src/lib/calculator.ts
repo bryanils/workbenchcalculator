@@ -545,8 +545,11 @@ export function calculate(config: BenchConfig): CalcResult {
     : 0;
   const diagonalBraceJoints =
     config.stretchers.diagonalBraces && !config.stretchers.floorStretchers ? 8 : 0;
-  // Knockdown bolts: Nicholson-style needs ~16 (4 per end + 4 per apron).
-  const knockdownBolts = config.knockdown ? 16 : 0;
+  // Knockdown bolts: Schwarz Nicholson-style needs ~16 (4 per end + 4 per
+  // apron). Moravian uses wedges instead of bolts; Roubo uses 8 barrel nuts
+  // for the long-rail joints — handled in the emission switch below.
+  const knockdownBolts =
+    config.knockdown && config.knockdownHardwareKind !== "wedged" ? 16 : 0;
 
   // Surface area for finish
   let surfaceArea = 0;
@@ -570,6 +573,8 @@ export function calculate(config: BenchConfig): CalcResult {
     {
       // shimmed legacy shape — computeHardware uses these existing field names
       joinery: config.joinery,
+      apronsOverlapLegs: config.apronsOverlapLegs,
+      topSheetLayers: config.topSheetLayers,
       doubledTop: config.topConstruction === "doubled-sheet",
       casters: config.casters,
       edgeBand: config.edgeBand,
@@ -590,41 +595,107 @@ export function calculate(config: BenchConfig): CalcResult {
     },
   );
 
-  // Knockdown hardware addendum
-  if (knockdownBolts > 0) {
+  // Knockdown hardware addendum — dispatched by knockdownHardwareKind.
+  // Sources: Lost Art Press Knockdown Nicholson materials page (bolted),
+  // Wood and Shop / Will Myers Moravian (wedged), Benchcrafted Split-Top
+  // Roubo Benchmaker's Package (barrel-nut).
+  if (config.knockdownHardwareKind === "wedged") {
+    // Moravian: tusk tenons through both long stretchers, two wedges each.
+    // Wedges are shop-made from scrap hardwood — $1.25/ea covers a 1 bd ft
+    // chunk of red oak (Home Depot ~$5/bd ft) that yields ~4 wedges.
+    hardware.unshift(
+      {
+        qty: 4,
+        itemLabel: 'Hardwood wedges (oak/maple, ~1/2" x 1-1/2" x 4")',
+        note: "Drive through tusk-tenon mortises in the long stretchers — pop out with a mallet to knock down.",
+        estimatedCost: 4 * 1.25,
+      },
+      {
+        qty: 8,
+        itemLabel: '3/8" x 2" white oak drawbore pegs',
+        note: "Lock the short-stretcher M&T joints into the legs.",
+        estimatedCost: 8 * 0.18,
+      },
+    );
+  } else if (config.knockdownHardwareKind === "barrel-nut") {
+    // Benchcrafted Split-Top Roubo Benchmaker's Package: 8 barrel nuts for
+    // the knockdown long-rail joints + 4 Spax lag screws to lock the top
+    // slabs onto the leg through-tenons. Benchcrafted doesn't sell barrel
+    // nuts à la carte; cross-dowel equivalent on Amazon ~$0.90/ea. Hex
+    // bolts: Everbilt 800900 3/8"-16 x 5", $25 / 25-pack = $1.00/ea.
+    hardware.unshift(
+      {
+        qty: 8,
+        itemLabel: 'Cross-dowel barrel nuts (3/8"-16)',
+        note: "Pair each with a hex bolt that pulls the long rail tight to the end-assembly tenon. (Benchcrafted Benchmaker's Package; generic cross-dowels work too.)",
+        estimatedCost: 8 * 0.90,
+      },
+      {
+        qty: 8,
+        itemLabel: 'Hex-head bolts 3/8"-16 x 5"',
+        note: "Drive through long-rail bolt holes into the barrel nuts buried in the end assemblies.",
+        estimatedCost: 8 * 1.00,
+      },
+      {
+        qty: 4,
+        itemLabel: 'Spax HD 1/4" x 5" lag screws',
+        note: "Top slab → leg through-tenon, one per leg.",
+        estimatedCost: 4 * 1.30,
+      },
+    );
+  } else if (knockdownBolts > 0) {
+    // Schwarz Knockdown Nicholson: 16 cap screws into ductile mounting
+    // plates buried in the leg face. Disassembles with a single 9/16" socket.
+    // Hex-bolt substitute at length used since HD doesn't stock exact
+    // 3/8"-16 x 2-1/2" Grade 5 cap screw; mounting plate is McMaster 11445T1
+    // (current price not publicly listed, $3 estimate; historical ~$1.69).
     hardware.unshift(
       {
         qty: knockdownBolts,
-        itemLabel: '3/8" x 16 cap screws (knockdown hardware)',
-        note: "With ductile mounting plates on the inside face of the aprons",
-        estimatedCost: knockdownBolts * 0.95,
+        itemLabel: 'Hex-head cap screws 3/8"-16 x 2-1/2"',
+        note: "Drive into ductile mounting plates on the inside face of the aprons",
+        estimatedCost: knockdownBolts * 0.85,
       },
       {
         qty: knockdownBolts,
-        itemLabel: '3/8" x 16 ductile mounting plates / threaded inserts',
-        estimatedCost: knockdownBolts * 1.85,
+        itemLabel: 'Ductile iron mounting plates, 3/8"-16 threaded (McMaster 11445T1)',
+        note: "Recess into the leg face; #10 wood screws hold each plate.",
+        estimatedCost: knockdownBolts * 3.00,
+      },
+      {
+        qty: knockdownBolts * 2,
+        itemLabel: '#10 x 1" slot-head wood screws',
+        note: "Two per mounting plate to retain it in the leg recess.",
+        estimatedCost: knockdownBolts * 2 * 0.08,
       },
       {
         qty: knockdownBolts,
-        itemLabel: '3/8" flat + lock washers',
-        estimatedCost: knockdownBolts * 0.18,
+        itemLabel: '3/8" flat washers',
+        estimatedCost: knockdownBolts * 0.24,
+      },
+      {
+        qty: knockdownBolts,
+        itemLabel: '3/8" split-lock washers',
+        estimatedCost: knockdownBolts * 0.24,
       },
     );
   }
 
-  // Vise hardware
+  // Vise hardware (prices verified May 2026)
   if (config.vise === "leg-vise") {
+    // Lake Erie Toolworks Wood Vise Screw Basic Kit, $175.
     hardware.push({
       qty: 1,
       itemLabel: 'Leg-vise screw + nut (wood or Acme threaded)',
-      note: "Lake Erie Toolworks, Benchcrafted, or large all-thread + handle",
-      estimatedCost: 95,
+      note: "Lake Erie Toolworks Basic Kit, or large all-thread + handle",
+      estimatedCost: 175,
     });
   } else if (config.vise === "front-face-vise") {
+    // Yost M7WW 7" cast-iron face vise, $99.97 on Amazon.
     hardware.push({
       qty: 1,
       itemLabel: 'Front face vise (7" - 10" cast iron, e.g. Yost / Eclipse)',
-      estimatedCost: 90,
+      estimatedCost: 100,
     });
   } else if (config.vise === "tail-vise") {
     hardware.push({
@@ -633,10 +704,11 @@ export function calculate(config: BenchConfig): CalcResult {
       estimatedCost: 140,
     });
   } else if (config.vise === "quick-release-9in") {
+    // Shop Fox D4328 9" quick-release vise (Grizzly), $99.95.
     hardware.push({
       qty: 1,
-      itemLabel: 'Quick-release 9" woodworking vise',
-      estimatedCost: 65,
+      itemLabel: 'Quick-release 9" woodworking vise (Shop Fox D4328 or equiv)',
+      estimatedCost: 100,
     });
   } else if (config.vise === "pipe-clamp-vise") {
     hardware.push({
@@ -654,11 +726,13 @@ export function calculate(config: BenchConfig): CalcResult {
       const slideLen =
         [...stockedLengths].reverse().find((L) => L <= drawerGeo.boxDepth) ??
         stockedLengths[0];
+      // Everbilt D80624E-ZP-W 24" full-extension pair, $22.37. Shorter
+      // lengths in the same series scale roughly linearly (~$0.93/inch).
       hardware.push({
         qty: config.drawerCount,
         itemLabel: `${slideLen}" side-mount ball-bearing drawer slides (pair)`,
         note: "Full-extension, 100 lb class. Sold as pair (L + R) per drawer.",
-        estimatedCost: config.drawerCount * 14,
+        estimatedCost: config.drawerCount * Math.round(slideLen * 0.93 * 100) / 100,
       });
     } else {
       // Wooden runners — shop-made; just call out the wax & material.
@@ -669,11 +743,12 @@ export function calculate(config: BenchConfig): CalcResult {
         estimatedCost: 4,
       });
     }
+    // Home Depot value-pack cabinet knobs, ~$2/ea.
     hardware.push({
       qty: config.drawerCount,
       itemLabel: "Drawer pull (knob or wire pull)",
       note: "Mount through false front into drawer front.",
-      estimatedCost: config.drawerCount * 5,
+      estimatedCost: config.drawerCount * 2,
     });
   }
 

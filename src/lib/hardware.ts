@@ -37,17 +37,45 @@ export function computeHardware(
     const total =
       (counts.apronJoints + counts.shelfJoints + counts.middleStretcherJoints) *
       lagsPerJoint;
-    items.push({
-      qty: total,
-      itemLabel: 'Lag bolts 3/8" x 4"',
-      note: "With 3/8 washers — counter-bore the leg face",
-      estimatedCost: total * (getScrew("lag_3_8x4")?.pricePerEa ?? 0.85),
-    });
-    items.push({
-      qty: total,
-      itemLabel: '3/8" flat washers',
-      estimatedCost: total * 0.08,
-    });
+    if ((config as { apronsOverlapLegs?: boolean }).apronsOverlapLegs) {
+      // Apron passes the outside face of the leg → bolt runs all the way
+      // through (apron → leg → apron). That's a carriage bolt with a hex nut
+      // and washer on the inside (FamilyHandyman 2x4 "Work Bench on a
+      // Budget" / Schwarz Nicholson 2x12 apron pattern).
+      const cb = getScrew("carriage_3_8x3_1_2");
+      items.push({
+        qty: total,
+        itemLabel: cb?.label ?? 'Carriage bolts 3/8" x 3-1/2"',
+        note: "Through doubled-2x aprons / leg pair; square shoulder seats in apron face",
+        estimatedCost: total * (cb?.pricePerEa ?? 0.65),
+      });
+      // Everbilt 801750 3/8"-16 hex nut, $18.20 / 100-pack = $0.18/ea.
+      items.push({
+        qty: total,
+        itemLabel: '3/8" hex nuts',
+        note: "On the inside of the apron",
+        estimatedCost: total * 0.18,
+      });
+      // Everbilt 807230 3/8" flat washer, $23.87 / 100-pack = $0.24/ea.
+      items.push({
+        qty: total,
+        itemLabel: '3/8" flat washers',
+        note: "Under each hex nut",
+        estimatedCost: total * 0.24,
+      });
+    } else {
+      items.push({
+        qty: total,
+        itemLabel: 'Lag bolts 3/8" x 4"',
+        note: "With 3/8 washers — counter-bore the leg face",
+        estimatedCost: total * (getScrew("lag_3_8x4")?.pricePerEa ?? 0.78),
+      });
+      items.push({
+        qty: total,
+        itemLabel: '3/8" flat washers',
+        estimatedCost: total * 0.24,
+      });
+    }
   } else {
     // mortise & tenon — no metal fasteners, just glue + optional pegs
     const pegs = counts.apronJoints * 2 + counts.shelfJoints * 2;

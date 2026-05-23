@@ -4,6 +4,7 @@ import type {
   BenchStyleId,
   DrawerLocation,
   DrawerSlideType,
+  KnockdownHardwareKind,
   StretcherLayout,
   TopConstruction,
   TopLamOrientation,
@@ -85,6 +86,7 @@ export type BenchConfig = {
   tenonLength: number;
   legSplayDeg: number;
   knockdown: boolean;
+  knockdownHardwareKind?: KnockdownHardwareKind;
   vise: ViseKind;
   dogHoles: boolean;
   dogHoleSpacing: number;
