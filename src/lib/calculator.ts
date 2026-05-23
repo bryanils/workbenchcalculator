@@ -1,6 +1,7 @@
 import {
   getLumber,
   getSheet,
+  SHEET_PACKING_EXTRA_IN,
   type LumberSpec,
   type SheetSpec,
 } from "./materials";
@@ -459,7 +460,9 @@ export function calculate(config: BenchConfig): CalcResult {
   let sheetSqFt = 0;
   for (const [matId, inputs] of sheetInputsById) {
     const spec = getSheet(matId)!;
-    const { layouts, oversize } = packSheets(inputs, spec.width, spec.height, config.kerf);
+    const packW = spec.width + SHEET_PACKING_EXTRA_IN;
+    const packH = spec.height + SHEET_PACKING_EXTRA_IN;
+    const { layouts, oversize } = packSheets(inputs, packW, packH, config.kerf);
     for (const o of oversize) {
       warnings.push(
         `${spec.label} cut ${o.w}" × ${o.h}" (${o.purpose}) doesn't fit in a single ${spec.width}" × ${spec.height}" sheet.`,
@@ -469,6 +472,8 @@ export function calculate(config: BenchConfig): CalcResult {
       sheetLayouts.push({
         materialId: spec.id,
         materialLabel: spec.label,
+        nominalSheetW: spec.width,
+        nominalSheetH: spec.height,
         sheetW: l.sheetW,
         sheetH: l.sheetH,
         pieces: l.pieces,

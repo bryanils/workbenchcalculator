@@ -14,11 +14,14 @@ const HUES = [
 ];
 
 export function SheetDiagram({ layout, index, unit }: Props) {
-  const totalArea = layout.sheetW * layout.sheetH;
-  const wastePct = ((totalArea - layout.usedArea) / totalArea) * 100;
+  const displayW = layout.nominalSheetW;
+  const displayH = layout.nominalSheetH;
+  const nominalArea = displayW * displayH;
+  const wastePct = Math.max(0, ((nominalArea - layout.usedArea) / nominalArea) * 100);
+  const displayLong = Math.max(displayW, displayH);
 
   const pad = 12;
-  // Render sheet oriented landscape (96 wide, 48 tall)
+  // Draw landscape for readability, but display the standard nominal sheet size.
   const viewW = 600;
   const viewH = viewW * (layout.sheetH / layout.sheetW);
   const scale = viewW / layout.sheetW;
@@ -27,8 +30,8 @@ export function SheetDiagram({ layout, index, unit }: Props) {
     <Card className="p-3">
       <div className="mb-1 flex items-center justify-between">
         <div className="text-sm font-semibold">
-          Sheet {index + 1} — {layout.materialLabel} ({layout.sheetW}&quot;×
-          {layout.sheetH}&quot;)
+          Sheet {index + 1} — {layout.materialLabel} ({formatLength(displayW, unit)}×
+          {formatLength(displayH, unit)})
         </div>
         <div className="text-xs text-muted-foreground">waste: {wastePct.toFixed(0)}%</div>
       </div>
@@ -133,7 +136,7 @@ export function SheetDiagram({ layout, index, unit }: Props) {
             textAnchor="middle"
             className="fill-muted-foreground text-[10px]"
           >
-            {formatLength(layout.sheetW, unit)} ←
+            {formatLength(displayLong, unit)} ←
           </text>
         </g>
       </svg>

@@ -30,6 +30,10 @@ export type ScrewSpec = {
 const LUMBER_2X_LENGTHS = [96, 120, 144, 168, 192];
 const LUMBER_4X_LENGTHS = [96, 120, 144];
 
+// Nominal 4x8 sheet goods are usually shipped slightly oversized so clean
+// factory edges can be trimmed while still yielding nominal cuts after kerf.
+export const SHEET_PACKING_EXTRA_IN = 0.8;
+
 export const LUMBER: LumberSpec[] = [
   { id: "2x4",  label: "2x4",  actualWidth: 1.5, actualDepth: 3.5,   stockLengths: LUMBER_2X_LENGTHS, pricePerFt: 0.95 },
   { id: "2x6",  label: "2x6",  actualWidth: 1.5, actualDepth: 5.5,   stockLengths: LUMBER_2X_LENGTHS, pricePerFt: 1.50 },

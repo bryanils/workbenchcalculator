@@ -3,7 +3,8 @@ import { planWall, type WallPlanOption } from "./wallPlan";
 
 const baseInputs = {
   benchDepthIn: 24,
-  topSheetLayers: 1 as const,
+  benchHeightIn: 34,
+  styleId: "heavy-garage" as const,
 };
 
 function lengths(opt: WallPlanOption): number[] {
@@ -83,11 +84,10 @@ describe("planWall — practical recommendations", () => {
     }
   });
 
-  test("192\" recommends 2 × 96 (perfect sheet fit)", () => {
+  test("192\" recommends 2 × 96", () => {
     const opts = planWall({ ...baseInputs, wallLengthIn: 192 });
     const top = opts[0]!;
     expect(top.benches).toEqual([{ lengthIn: 96, count: 2 }]);
-    expect(top.sheetYieldPct).toBeCloseTo(1.0, 2);
   });
 
   test("144\" recommends 2 × 72 over 3 × 48", () => {
@@ -101,26 +101,6 @@ describe("planWall — practical recommendations", () => {
     const top = opts[0]!;
     expect(top.benches).toEqual([{ lengthIn: 96, count: 1 }]);
     expect(top.totalBenchCount).toBe(1);
-  });
-});
-
-describe("planWall — top doubling", () => {
-  test("doubled top reports 2× the sheet count of single", () => {
-    const single = planWall({ ...baseInputs, wallLengthIn: 192, topSheetLayers: 1 })[0]!;
-    const doubled = planWall({ ...baseInputs, wallLengthIn: 192, topSheetLayers: 2 })[0]!;
-    // Same plan shape, sheets doubled.
-    expect(doubled.benches).toEqual(single.benches);
-    expect(doubled.sheetsForTops).toBe(single.sheetsForTops * 2);
-  });
-
-  test("laminated top (layers=0) reports 0 sheets and notes lumber", () => {
-    const opts = planWall({ ...baseInputs, wallLengthIn: 192, topSheetLayers: 0 });
-    expect(opts.length).toBeGreaterThan(0);
-    for (const opt of opts) {
-      expect(opt.sheetsForTops).toBe(0);
-      expect(opt.sheetYieldPct).toBe(0);
-      expect(opt.notes.some((n) => n.toLowerCase().includes("lumber"))).toBe(true);
-    }
   });
 });
 

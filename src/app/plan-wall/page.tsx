@@ -35,20 +35,7 @@ type FormState = {
   height: number;       // in current unit
   minLen: number;       // inches (kept in inches; advanced)
   maxLen: number;       // inches
-  topLayersOverride?: 0 | 1 | 2;
 };
-
-function topLayersForStyle(id: BenchStyleId): 0 | 1 | 2 {
-  const s = STYLE_PROFILES.find((x) => x.id === id);
-  if (!s) return 1;
-  if (s.topConstruction === "doubled-sheet") return 2;
-  if (s.topConstruction === "single-sheet") return 1;
-  return 0; // laminated-2x or slab — lumber top, not sheets
-}
-
-function topLayersLabel(n: 0 | 1 | 2): string {
-  return n === 2 ? "doubled sheet" : n === 1 ? "single sheet" : "laminated lumber";
-}
 
 const DEFAULT_STYLE: BenchStyleId = "heavy-garage";
 
@@ -72,18 +59,16 @@ export default function PlanWallPage() {
     };
   });
 
-  const styleTopLayers = topLayersForStyle(form.styleId);
-  const topLayers: 0 | 1 | 2 = form.topLayersOverride ?? styleTopLayers;
-
   const options = useMemo<WallPlanOption[]>(() => {
     return planWall({
       wallLengthIn: toInches(form.wallLength, unit),
       benchDepthIn: toInches(form.depth, unit),
-      topSheetLayers: topLayers,
+      benchHeightIn: toInches(form.height, unit),
+      styleId: form.styleId,
       minBenchLengthIn: form.minLen,
       maxBenchLengthIn: form.maxLen,
     });
-  }, [form, unit, topLayers]);
+  }, [form, unit]);
 
   const handleStyleChange = (id: BenchStyleId) => {
     const d = defaultsForStyle(id, unit);
@@ -154,32 +139,6 @@ export default function PlanWallPage() {
                       onChange={(v) => setForm({ ...form, height: v })}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Top construction</Label>
-                    <Select
-                      value={form.topLayersOverride === undefined ? "style" : String(form.topLayersOverride)}
-                      onValueChange={(v) =>
-                        setForm({
-                          ...form,
-                          topLayersOverride:
-                            v === "style" ? undefined : (Number(v) as 0 | 1 | 2),
-                        })
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="style">
-                          Style default ({topLayersLabel(styleTopLayers)})
-                        </SelectItem>
-                        <SelectItem value="1">Single sheet (1 layer)</SelectItem>
-                        <SelectItem value="2">Doubled sheet (2 layers)</SelectItem>
-                        <SelectItem value="0">Laminated lumber (no sheets)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <Separator />
 
                   <div>
@@ -252,7 +211,7 @@ export default function PlanWallPage() {
                 <>
                   <p className="text-sm text-muted-foreground">
                     {options.length} suggestion{options.length === 1 ? "" : "s"} ranked by
-                    sheet yield, simplicity, and bench size.
+                    estimated material yield, simplicity, module size, and clean dimensions.
                   </p>
                   <ol className="space-y-3">
                     {options.map((opt, idx) => (
@@ -324,8 +283,8 @@ function OptionCard({
   heightIn: number;
   unit: Unit;
 }) {
-  const yieldPct = Math.round(option.sheetYieldPct * 100);
   const isTop = rank === 1;
+  const materialYield = Math.round(option.materialYieldPct * 100);
 
   return (
     <li>
@@ -339,9 +298,10 @@ function OptionCard({
             <CardTitle className="mt-1 text-xl">{option.label}</CardTitle>
             <CardDescription className="mt-1">
               {option.totalBenchCount} bench{option.totalBenchCount === 1 ? "" : "es"}
-              {option.sheetsForTops > 0
-                ? ` • ${option.sheetsForTops} sheet${option.sheetsForTops === 1 ? "" : "s"} (yield ${yieldPct}%)`
-                : " • laminated lumber top"}
+              {option.distinctLengths === 1
+                ? " • one repeated size"
+                : ` • ${option.distinctLengths} bench sizes`}
+              {` • estimated material yield ${materialYield}%`}
             </CardDescription>
           </div>
           <div className="hidden flex-col items-end gap-2 sm:flex">

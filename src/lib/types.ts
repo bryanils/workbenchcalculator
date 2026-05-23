@@ -155,6 +155,8 @@ export type LumberBoardOut = {
 export type SheetLayoutOut = {
   materialId: string;
   materialLabel: string;
+  nominalSheetW: number;
+  nominalSheetH: number;
   sheetW: number;
   sheetH: number;
   pieces: {
