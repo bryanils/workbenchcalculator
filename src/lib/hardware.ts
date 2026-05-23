@@ -68,7 +68,7 @@ export function computeHardware(
   );
 
   // ----- Doubled top -----
-  if (config.doubledTop && counts.doublerFastenPoints > 0) {
+  if (config.topSheetLayers === 2 && counts.doublerFastenPoints > 0) {
     pushScrew(
       items,
       "wood_1_1_4",
@@ -127,7 +127,7 @@ export function computeHardware(
     counts.middleStretcherJoints +
     counts.toolWellJoints +
     counts.diagonalBraceJoints +
-    (config.doubledTop ? 4 : 0);
+    (config.topSheetLayers === 2 ? 4 : 0);
   const glueOz = Math.max(2, Math.ceil(glueJoints * 0.5));
   items.push({
     qty: glueOz,
@@ -163,7 +163,7 @@ export function computeHardware(
 
   // Edge banding for top (perimeter, if plywood + opted in)
   if (config.edgeBand && counts.perimeterFt > 0) {
-    const ft = Math.ceil(counts.perimeterFt * (config.doubledTop ? 2 : 1) + 2);
+    const ft = Math.ceil(counts.perimeterFt * (config.topSheetLayers === 2 ? 2 : 1) + 2);
     items.push({
       qty: ft,
       itemLabel: CONSUMABLES.edge_band_ft.label,

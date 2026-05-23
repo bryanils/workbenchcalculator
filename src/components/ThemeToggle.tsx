@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { Sun, Moon, Monitor } from "lucide-react";

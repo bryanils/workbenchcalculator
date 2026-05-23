@@ -642,7 +642,7 @@ export function calculate(config: BenchConfig): CalcResult {
   }
 
   // Drawer hardware (metal slides; wooden runners are just shop-made strips)
-  if (drawerGeo && drawerGeo.warnings.length === 0 && config.drawerCount > 0) {
+  if (drawerGeo?.warnings.length === 0 && config.drawerCount > 0) {
     if (config.drawerSlideType === "metal") {
       // Pick a stocked slide length that doesn't exceed drawer depth.
       const stockedLengths = [10, 12, 14, 16, 18, 20, 22, 24];

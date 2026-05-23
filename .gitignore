@@ -44,3 +44,6 @@ yarn-error.log*
 
 # idea files
 .idea
+
+# claude handoffs (per-project)
+.claude/handoffs/

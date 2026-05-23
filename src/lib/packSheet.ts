@@ -290,13 +290,16 @@ function splitFreeRect(
   // right-of-piece is short (height = piece height).
   // pickFullWidthTop=false => vertical cut: right-of-piece spans parent's
   // full height, top spans only piece width.
+  // Per Jylanki "A Thousand Ways to Pack the Bin":
+  //   SAS / LAS compare the FREE rect's own dimensions (f.w vs f.h).
+  //   SLAS / LLAS compare leftover area projected through the placed piece.
   let fullWidthTop: boolean;
   switch (rule) {
     case "sas":
-      fullWidthTop = leftoverW < leftoverH;
+      fullWidthTop = f.w <= f.h;
       break;
     case "las":
-      fullWidthTop = leftoverW >= leftoverH;
+      fullWidthTop = f.w >= f.h;
       break;
     case "slas":
       fullWidthTop = leftoverW * ph < leftoverH * pw;
@@ -385,8 +388,8 @@ function swapNeighbors(cuts: SheetCutInput[], rand: () => number, swaps: number)
     const offset = Math.floor(rand() * window) - Math.floor(window / 2);
     const j = Math.max(0, Math.min(arr.length - 1, i + offset));
     if (i === j) continue;
-    const tmp = arr[i] as SheetCutInput;
-    arr[i] = arr[j] as SheetCutInput;
+    const tmp = arr[i]!;
+    arr[i] = arr[j]!;
     arr[j] = tmp;
   }
   return arr;

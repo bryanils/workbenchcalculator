@@ -1,14 +1,16 @@
-import Head from "next/head";
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Printer, Upload, Download, Trash2, Hammer } from "lucide-react";
+import { Printer, Upload, Download, Trash2 } from "lucide-react";
 import { calculateFromInputs } from "~/lib/calculator";
 import type { BenchConfig, CalcResult, SimpleInputs } from "~/lib/types";
 import { formatLength, fromInches, toInches, type Unit } from "~/lib/units";
+import { parseLengthToInches } from "~/lib/parseLength";
 import { LumberDiagram } from "~/components/LumberDiagram";
 import { SheetDiagram } from "~/components/SheetDiagram";
 import { BenchIsoDiagram } from "~/components/BenchIsoDiagram";
 import { ElevationViews } from "~/components/ElevationViews";
-import { ThemeToggle } from "~/components/ThemeToggle";
 import { PRESETS } from "~/lib/presets";
 import {
   STYLE_PROFILES,
@@ -127,6 +129,8 @@ function buildInputs(form: FormState, unit: Unit): SimpleInputs {
 }
 
 export default function Home() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [unit, setUnit] = useState<Unit>("in");
   const [form, setForm] = useState<FormState>(() => formFromInputs(DEFAULT_INPUTS));
   const [savedDesigns, setSavedDesigns] = useState<SavedDesign[]>([]);
@@ -136,6 +140,19 @@ export default function Home() {
 
   useEffect(() => {
     setSavedDesigns(loadSavedDesigns());
+  }, []);
+
+  // Seed the form from query params when arriving from /plan-wall.
+  // Clears the URL afterward so a manual refresh doesn't re-seed.
+  useEffect(() => {
+    const q = Object.fromEntries(searchParams?.entries() ?? []);
+    const seeded = seedFromQuery(q);
+    if (seeded) {
+      setUnit("in");
+      setForm(seeded);
+      router.replace("/", { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const inputs = useMemo(() => buildInputs(form, unit), [form, unit]);
@@ -246,39 +263,23 @@ export default function Home() {
 
   return (
     <>
-      <Head>
-        <title>Workbench Calculator — real plans, real cut lists</title>
-        <meta
-          name="description"
-          content="Pick a real workbench style — Roubo, Moravian, Knockdown Nicholson, Garage Workhorse — set your dimensions, get a structurally-sound cut list, materials list, and step-by-step build directions."
-        />
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-      <main className="min-h-screen bg-background text-foreground">
+      <main className="bg-background text-foreground">
         <div className="mx-auto max-w-7xl px-4 py-6">
-          <header className="no-print mb-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-                <Hammer className="size-5" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">
-                  Workbench Calculator
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Pick a real bench style, set three dimensions, get a buildable plan.
-                </p>
-              </div>
+          <div className="no-print mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Calculator</h1>
+              <p className="text-sm text-muted-foreground">
+                Pick a real bench style, set three dimensions, get a buildable plan.
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <UnitToggle value={unit} onChange={handleUnitChange} />
-              <ThemeToggle />
               <PrintMenu
                 sections={printSections}
                 setSections={setPrintSections}
               />
             </div>
-          </header>
+          </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1fr]">
             <aside className="no-print space-y-4 self-start lg:sticky lg:top-4">
@@ -1258,6 +1259,41 @@ function UnitToggle({
       ))}
     </div>
   );
+}
+
+function seedFromQuery(q: Record<string, string | string[] | undefined>): FormState | null {
+  const num = (v: string | string[] | undefined): number | undefined => {
+    if (typeof v !== "string") return undefined;
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const str = (v: string | string[] | undefined): string | undefined =>
+    typeof v === "string" ? v : undefined;
+
+  const topLength = num(q.topLength);
+  const topDepth = num(q.topDepth);
+  const totalHeight = num(q.totalHeight);
+  const benchCount = num(q.benchCount);
+  const styleIdRaw = str(q.styleId);
+
+  if (
+    topLength === undefined &&
+    topDepth === undefined &&
+    totalHeight === undefined &&
+    benchCount === undefined &&
+    styleIdRaw === undefined
+  ) {
+    return null;
+  }
+
+  const style = STYLE_PROFILES.find((s) => s.id === styleIdRaw) ?? STYLE_PROFILES.find((s) => s.id === DEFAULT_INPUTS.styleId)!;
+  return formFromInputs({
+    styleId: style.id,
+    topLength: topLength ?? style.defaultLength,
+    topDepth: topDepth ?? style.defaultDepth,
+    totalHeight: totalHeight ?? style.defaultHeight,
+    benchCount: benchCount ?? 1,
+  });
 }
 
 function formFromInputs(input: SimpleInputs): FormState {

@@ -16,7 +16,8 @@
     "check": "oxlint . && bunx tsgo --noEmit",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
-    "tc": "bunx tsgo --noEmit"
+    "tc": "bunx tsgo --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",
