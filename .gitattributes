@@ -1,0 +1,21 @@
+# Force LF line endings for every text file in the repo, on every platform.
+# Stops Windows/WSL checkouts from polluting commits and PRs with CRLF↔LF flips.
+
+* text=auto eol=lf
+
+# Binary files — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.glb binary
+*.gltf binary

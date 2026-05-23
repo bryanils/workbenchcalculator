@@ -25,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { ScrollArea } from "~/components/ui/scroll-area";
+import { PageHeaderSlot } from "~/components/PageHeaderSlot";
 
 type FormState = {
   styleId: BenchStyleId;
@@ -91,18 +93,17 @@ export default function PlanWallPage() {
   const u = unit === "in" ? '"' : " mm";
 
   return (
-    <>
-      <main className="bg-background text-foreground">
-        <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold tracking-tight">Plan a wall</h1>
-            <p className="text-sm text-muted-foreground">
-              Enter a wall length and pick the bench layout that fits best.
-            </p>
-          </div>
+    <div className="@container flex h-full min-h-0 flex-1 flex-col bg-background text-foreground">
+      <PageHeaderSlot>
+        <span className="truncate text-sm font-medium text-muted-foreground">
+          Plan a wall
+        </span>
+      </PageHeaderSlot>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1fr]">
-            <aside className="space-y-4 self-start lg:sticky lg:top-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[96rem] flex-1 flex-col gap-6 px-4 py-4 @4xl:flex-row">
+        <aside className="flex min-h-0 flex-1 flex-col @4xl:w-[22rem] @4xl:flex-none">
+          <ScrollArea className="h-full">
+            <div className="space-y-4 pr-3">
               <Card>
                 <CardHeader>
                   <CardTitle>Wall &amp; bench size</CardTitle>
@@ -233,9 +234,13 @@ export default function PlanWallPage() {
                   </div>
                 </CardContent>
               </Card>
-            </aside>
+            </div>
+          </ScrollArea>
+        </aside>
 
-            <section className="space-y-4">
+        <section className="flex min-h-0 flex-1 flex-col">
+          <ScrollArea className="h-full">
+            <div className="space-y-4 pr-3">
               {options.length === 0 ? (
                 <Card>
                   <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -264,11 +269,11 @@ export default function PlanWallPage() {
                   </ol>
                 </>
               )}
-            </section>
-          </div>
-        </div>
-      </main>
-    </>
+            </div>
+          </ScrollArea>
+        </section>
+      </div>
+    </div>
   );
 }
 

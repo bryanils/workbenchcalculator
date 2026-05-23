@@ -3,7 +3,6 @@ import { Geist } from "next/font/google";
 
 import { SiteHeader } from "~/components/SiteHeader";
 import { ThemeProvider } from "~/components/providers/ThemeProvider";
-import { ScrollArea } from "~/components/ui/scroll-area";
 import { TRPCReactProvider } from "~/trpc/react";
 
 import "~/styles/globals.css";
@@ -36,7 +35,7 @@ export default function RootLayout({
           <TRPCReactProvider>
             <div className={`${geist.variable} flex h-screen flex-col overflow-hidden font-sans`}>
               <SiteHeader />
-              <ScrollArea className="flex-1">{children}</ScrollArea>
+              <div className="flex min-h-0 flex-1 flex-col">{children}</div>
             </div>
           </TRPCReactProvider>
         </ThemeProvider>

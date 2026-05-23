@@ -56,6 +56,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
+import { PageHeaderSlot } from "~/components/PageHeaderSlot";
 
 const DEFAULT_INPUTS: SimpleInputs = {
   styleId: "heavy-garage",
@@ -262,27 +264,24 @@ export default function Home() {
   const config = result.derived;
 
   return (
-    <>
-      <main className="bg-background text-foreground">
-        <div className="mx-auto max-w-7xl px-4 py-6">
-          <div className="no-print mb-4 flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Calculator</h1>
-              <p className="text-sm text-muted-foreground">
-                Pick a real bench style, set three dimensions, get a buildable plan.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <UnitToggle value={unit} onChange={handleUnitChange} />
-              <PrintMenu
-                sections={printSections}
-                setSections={setPrintSections}
-              />
-            </div>
-          </div>
+    <div className="@container flex h-full min-h-0 flex-1 flex-col bg-background text-foreground">
+      <PageHeaderSlot>
+        <span className="truncate text-sm font-medium text-muted-foreground">
+          Calculator
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <UnitToggle value={unit} onChange={handleUnitChange} />
+          <PrintMenu
+            sections={printSections}
+            setSections={setPrintSections}
+          />
+        </div>
+      </PageHeaderSlot>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_1fr]">
-            <aside className="no-print space-y-4 self-start lg:sticky lg:top-4">
+      <div className="mx-auto flex min-h-0 w-full max-w-[96rem] flex-1 flex-col gap-6 px-4 py-4 @4xl:flex-row">
+        <aside className="no-print flex min-h-0 flex-1 flex-col @4xl:w-[22rem] @4xl:flex-none">
+          <ScrollArea className="h-full">
+            <div className="space-y-4 pr-3">
               <SidebarInputs
                 form={form}
                 setForm={setForm}
@@ -301,44 +300,48 @@ export default function Home() {
                 onImport={(f) => handleImportFile(f)}
                 fileInputRef={fileInputRef}
               />
-            </aside>
+            </div>
+          </ScrollArea>
+        </aside>
 
-            <section className="space-y-4">
-              {result.warnings.length > 0 && (
-                <Alert variant="destructive">
-                  <AlertTitle>Calculator warnings</AlertTitle>
-                  <AlertDescription>
-                    <ul className="ml-5 list-disc text-sm">
-                      {result.warnings.map((w, i) => (
-                        <li key={i}>{w}</li>
-                      ))}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
+        <section className="flex min-h-0 flex-1 flex-col">
+          <Tabs defaultValue="overview" className="no-print flex min-h-0 flex-1 flex-col gap-3">
+            <TabsList className="w-full shrink-0 justify-start overflow-x-auto">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="cutplan">Cut Plan</TabsTrigger>
+              <TabsTrigger value="materials">Materials</TabsTrigger>
+              <TabsTrigger value="directions">Directions</TabsTrigger>
+              <TabsTrigger value="print">Print preview</TabsTrigger>
+            </TabsList>
 
-              <Tabs defaultValue="overview" className="no-print space-y-4">
-                <TabsList>
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="cutplan">Cut Plan</TabsTrigger>
-                  <TabsTrigger value="materials">Materials</TabsTrigger>
-                  <TabsTrigger value="directions">Directions</TabsTrigger>
-                  <TabsTrigger value="print">Print preview</TabsTrigger>
-                </TabsList>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="space-y-4 pr-3">
+                {result.warnings.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Calculator warnings</AlertTitle>
+                    <AlertDescription>
+                      <ul className="ml-5 list-disc text-sm">
+                        {result.warnings.map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-                <TabsContent value="overview" className="space-y-4">
+                <TabsContent value="overview" className="mt-0 space-y-4">
                   <OverviewTab result={result} config={config} unit={unit} />
                 </TabsContent>
-                <TabsContent value="cutplan" className="space-y-4">
+                <TabsContent value="cutplan" className="mt-0 space-y-4">
                   <CutPlanTab result={result} unit={unit} />
                 </TabsContent>
-                <TabsContent value="materials" className="space-y-4">
+                <TabsContent value="materials" className="mt-0 space-y-4">
                   <MaterialsTab result={result} />
                 </TabsContent>
-                <TabsContent value="directions" className="space-y-4">
+                <TabsContent value="directions" className="mt-0 space-y-4">
                   <DirectionsTab result={result} />
                 </TabsContent>
-                <TabsContent value="print" className="space-y-4">
+                <TabsContent value="print" className="mt-0 space-y-4">
                   <PrintPreview
                     result={result}
                     config={config}
@@ -346,21 +349,21 @@ export default function Home() {
                     sections={printSections}
                   />
                 </TabsContent>
-              </Tabs>
-
-              <div className="print-only">
-                <PrintPreview
-                  result={result}
-                  config={config}
-                  unit={unit}
-                  sections={printSections}
-                />
               </div>
-            </section>
+            </ScrollArea>
+          </Tabs>
+
+          <div className="print-only">
+            <PrintPreview
+              result={result}
+              config={config}
+              unit={unit}
+              sections={printSections}
+            />
           </div>
-        </div>
-      </main>
-    </>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -1006,33 +1009,36 @@ function CutPlanTab({ result, unit }: { result: CalcResult; unit: Unit }) {
 
 function CutListTable({ rows, unit }: { rows: CalcResult["cutList"]; unit: Unit }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-left text-xs text-muted-foreground">
-            <th className="py-2 pr-3">#</th>
-            <th className="py-2 pr-3">Qty</th>
-            <th className="py-2 pr-3">Material</th>
-            <th className="py-2 pr-3">Dimensions</th>
-            <th className="py-2 pr-3">Purpose</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.partCode} className="border-b border-border/60 align-top">
-              <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground">{r.partCode}</td>
-              <td className="py-1.5 pr-3 font-semibold">{r.qty}</td>
-              <td className="py-1.5 pr-3">{r.materialLabel}</td>
-              <td className="py-1.5 pr-3 font-mono text-xs">
-                {formatLength(r.length, unit)}
-                {r.width !== undefined && ` × ${formatLength(r.width, unit)}`}
-                {r.thickness !== undefined && ` × ${formatLength(r.thickness, unit)}`}
-              </td>
-              <td className="py-1.5 pr-3 text-muted-foreground">{r.purpose}</td>
+    <div className="w-full max-w-full overflow-hidden">
+      <ScrollArea className="w-full">
+        <table className="min-w-max text-sm">
+          <thead>
+            <tr className="border-b text-left text-xs text-muted-foreground">
+              <th className="py-2 pr-3">#</th>
+              <th className="py-2 pr-3">Qty</th>
+              <th className="py-2 pr-3">Material</th>
+              <th className="py-2 pr-3">Dimensions</th>
+              <th className="py-2 pr-3">Purpose</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.partCode} className="border-b border-border/60 align-top">
+                <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground">{r.partCode}</td>
+                <td className="py-1.5 pr-3 font-semibold">{r.qty}</td>
+                <td className="py-1.5 pr-3 whitespace-nowrap">{r.materialLabel}</td>
+                <td className="py-1.5 pr-3 font-mono text-xs whitespace-nowrap">
+                  {formatLength(r.length, unit)}
+                  {r.width !== undefined && ` × ${formatLength(r.width, unit)}`}
+                  {r.thickness !== undefined && ` × ${formatLength(r.thickness, unit)}`}
+                </td>
+                <td className="py-1.5 pr-3 text-muted-foreground">{r.purpose}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
     </div>
   );
 }
@@ -1052,31 +1058,34 @@ function MaterialsTab({ result }: { result: CalcResult }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="py-2 pr-3">Qty</th>
-                  <th className="py-2 pr-3">Item</th>
-                  <th className="py-2 pr-3">Note</th>
-                  <th className="py-2 pr-3 text-right">Est. cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.hardware.map((h, i) => (
-                  <tr key={i} className="border-b border-border/60">
-                    <td className="py-1.5 pr-3 font-semibold">
-                      {h.qty}{h.unit ? ` ${h.unit}` : ""}
-                    </td>
-                    <td className="py-1.5 pr-3">{h.itemLabel}</td>
-                    <td className="py-1.5 pr-3 text-muted-foreground">{h.note ?? ""}</td>
-                    <td className="py-1.5 pr-3 text-right font-mono tabular-nums">
-                      {h.estimatedCost !== undefined ? `$${h.estimatedCost.toFixed(2)}` : "—"}
-                    </td>
+          <div className="w-full max-w-full overflow-hidden">
+            <ScrollArea className="w-full">
+              <table className="min-w-max text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-3">Qty</th>
+                    <th className="py-2 pr-3">Item</th>
+                    <th className="py-2 pr-3">Note</th>
+                    <th className="py-2 pr-3 text-right">Est. cost</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {result.hardware.map((h, i) => (
+                    <tr key={i} className="border-b border-border/60">
+                      <td className="py-1.5 pr-3 font-semibold whitespace-nowrap">
+                        {h.qty}{h.unit ? ` ${h.unit}` : ""}
+                      </td>
+                      <td className="py-1.5 pr-3">{h.itemLabel}</td>
+                      <td className="py-1.5 pr-3 text-muted-foreground">{h.note ?? ""}</td>
+                      <td className="py-1.5 pr-3 text-right font-mono tabular-nums whitespace-nowrap">
+                        {h.estimatedCost !== undefined ? `$${h.estimatedCost.toFixed(2)}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </div>
         </CardContent>
       </Card>

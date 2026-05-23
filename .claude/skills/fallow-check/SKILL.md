@@ -72,8 +72,32 @@ Then use `Read` / `Grep` to slice the JSON file rather than dumping the full pay
 - Runtime bugs / test failures — fallow is static analysis only.
 - Performance profiling — fallow measures complexity, not runtime cost.
 
+## Config Reference (`.fallowrc.json`)
+
+Keys that matter for this project, with their actual accepted value types per the fallow docs:
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `entry` | string[] (globs) | Entry points. App Router files are wired up explicitly here. |
+| `ignorePatterns` | string[] (globs) | File globs to exclude from analysis entirely. Use this to scope out shadcn (`src/components/ui/**`). |
+| `ignoreDependencies` | string[] (**EXACT package names only**) | **NO globs, NO regex.** `@radix-ui/*` does NOT work — every package must be listed individually. |
+| `ignoreExports` | array of `{ file, exports[] }` | Suppress unused-export findings for specific files. Supports `"exports": ["*"]`. |
+| `duplicates.minOccurrences` | number | Default 3. Lower to 2 to see every pair. |
+| `overrides` | array | Per-folder rule severity changes only — does NOT change dep attribution. |
+
+### Scoping out a folder AND its exclusive deps
+
+There is **no single config switch** for this (confirmed in fallow docs). You must do BOTH:
+
+1. Add the folder glob to `ignorePatterns`.
+2. Add every dependency that was only consumed by that folder to `ignoreDependencies` — enumerated, one entry per package.
+
+For this project's shadcn setup, the enumerated deps are already in `.fallowrc.json` (all `@radix-ui/*` packages plus `radix-ui`, `react-resizable-panels`, `class-variance-authority`, `sonner`, `vaul`, `tailwind-merge`, `tw-animate-css`, `clsx`, `lucide-react`, `next-themes`). If the user adds a new shadcn component that pulls in a new dep, that dep must be appended to `ignoreDependencies` by hand.
+
 ## Common Pitfalls
 
+- **DO NOT use globs in `ignoreDependencies`.** Fallow accepts exact strings only. `@radix-ui/*`, `@radix-ui/.*`, `**` etc. are silently ignored. The CONFIG VALIDATOR DOES NOT WARN — the patterns just don't match, and the deps still show as unused. Always enumerate.
+- **DO NOT guess at config field names.** The schema is strict and rejects unknown keys with a parse error. Confirmed valid keys: `$schema`, `extends`, `entry`, `ignorePatterns`, `framework`, `workspaces`, `ignoreDependencies`, `ignoreExports`, `ignoreCatalogReferences`, `ignoreDependencyOverrides`, `ignoreExportsUsedInFile`, `ignoreDecorators`, `usedClassMembers`, `duplicates`, `health`, `rules`, `boundaries`, `flags`, `fix`, `resolve`, `production`, `plugins`, `dynamicallyLoaded`, `overrides`, `codeowners`, `publicPackages`, `regression`, `audit`, `sealed`, `includeEntryExports`, `cache`. The field is `ignorePatterns`, NOT `ignore`.
 - **`bunx` not found in PowerShell**: PowerShell needs `bun` on its PATH. If powershell.exe reports "bun is not recognized", tell the user to add bun's Windows install dir to their Windows PATH (do not try to fix it from WSL).
 - **Path with quotes**: If the working directory ever contains a single quote, switch to double-quote escaping inside PS: `cd \"C:\\path\\with'quote\"`. This repo's path is safe.
 - **Color codes in output**: `--format json` strips them. If you ever skip `--format json`, ANSI escape codes will pollute the output — always prefer JSON.
