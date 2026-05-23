@@ -104,7 +104,7 @@ describe("deriveGeometry — sanity", () => {
   });
 
   test("splayed legs widen the short floor span and use a longer blank", () => {
-    const c = deriveBenchConfig(baseInput({ styleId: "moravian" }));
+    const c = deriveBenchConfig(baseInput({ styleId: "moravian-knockdown" }));
     const g = deriveGeometry(c);
     if (c.legSplayDeg > 0) {
       expect(g.floorSpanShort).toBeGreaterThan(g.legSpanShort);

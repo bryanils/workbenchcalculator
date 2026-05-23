@@ -725,7 +725,7 @@ export function calculate(config: BenchConfig): CalcResult {
       const stockedLengths = [10, 12, 14, 16, 18, 20, 22, 24];
       const slideLen =
         [...stockedLengths].reverse().find((L) => L <= drawerGeo.boxDepth) ??
-        stockedLengths[0];
+        10;
       // Everbilt D80624E-ZP-W 24" full-extension pair, $22.37. Shorter
       // lengths in the same series scale roughly linearly (~$0.93/inch).
       hardware.push({

@@ -4,10 +4,11 @@
 // lives in styles.ts.
 
 import type { SimpleInputs } from "./types";
+import type { BenchStyleId } from "./styles";
 import { STYLE_PROFILES } from "./styles";
 
 export type Preset = {
-  id: string;
+  id: BenchStyleId;
   name: string;
   description: string;
   input: SimpleInputs;

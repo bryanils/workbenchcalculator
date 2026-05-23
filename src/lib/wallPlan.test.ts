@@ -7,15 +7,6 @@ const baseInputs = {
   styleId: "heavy-garage" as const,
 };
 
-function lengths(opt: WallPlanOption): number[] {
-  // Expand grouped benches back to a flat array of lengths.
-  const out: number[] = [];
-  for (const g of opt.benches) {
-    for (let i = 0; i < g.count; i++) out.push(g.lengthIn);
-  }
-  return out.sort((a, b) => a - b);
-}
-
 function sumLengths(opt: WallPlanOption): number {
   return opt.benches.reduce((s, g) => s + g.lengthIn * g.count, 0);
 }

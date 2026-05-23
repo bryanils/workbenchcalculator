@@ -40,6 +40,7 @@ export default function RootLayout({
                 <SiteHeader />
                 <div className="flex min-h-0 flex-1 flex-col">{children}</div>
               </div>
+              <Toaster position="bottom-right" richColors closeButton />
             </TooltipProvider>
           </TRPCReactProvider>
         </ThemeProvider>
