@@ -47,3 +47,4 @@ yarn-error.log*
 
 # claude handoffs (per-project)
 .claude/handoffs/
+.fallow/

@@ -6,7 +6,7 @@ import { Printer, Upload, Download, Trash2 } from "lucide-react";
 import { calculateFromInputs } from "~/lib/calculator";
 import type { BenchConfig, CalcResult, SimpleInputs } from "~/lib/types";
 import { formatLength, fromInches, toInches, type Unit } from "~/lib/units";
-import { parseLengthToInches } from "~/lib/parseLength";
+import { feetInchesSchema, splitFeetInches } from "~/lib/parseLength";
 import { LumberDiagram } from "~/components/LumberDiagram";
 import { SheetDiagram } from "~/components/SheetDiagram";
 import { BenchIsoDiagram } from "~/components/BenchIsoDiagram";
@@ -415,10 +415,13 @@ function SidebarInputs({
 
         <div className="grid grid-cols-3 gap-2">
           <DimField label="Length" hint={`${conv(lenMin)}-${conv(lenMax)}${u}`} suffix={u} step={unit === "in" ? 0.25 : 1}
+            unit={unit}
             value={form.topLength} onChange={(v) => setForm({ ...form, topLength: v })} />
           <DimField label="Depth" hint={`${conv(depMin)}-${conv(depMax)}${u}`} suffix={u} step={unit === "in" ? 0.25 : 1}
+            unit={unit}
             value={form.topDepth} onChange={(v) => setForm({ ...form, topDepth: v })} />
           <DimField label="Height" hint={`${conv(hMin)}-${conv(hMax)}${u}`} suffix={u} step={unit === "in" ? 0.25 : 1}
+            unit={unit}
             value={form.totalHeight} onChange={(v) => setForm({ ...form, totalHeight: v })} />
         </div>
 
@@ -595,7 +598,7 @@ function SidebarInputs({
 }
 
 function DimField({
-  label, hint, suffix, value, onChange, step = 1,
+  label, hint, suffix, value, onChange, step = 1, unit,
 }: {
   label: string;
   hint?: string;
@@ -603,7 +606,57 @@ function DimField({
   value: number;
   onChange: (v: number) => void;
   step?: number;
+  unit?: Unit;
 }) {
+  // Split feet + inches input only when the field is in inches mode.
+  if (unit === "in") {
+    const split = splitFeetInches(value);
+    const handleChange = (next: { feet?: number; inches?: number }) => {
+      const candidate = {
+        feet: next.feet ?? split.feet,
+        inches: next.inches ?? split.inches,
+      };
+      const parsed = feetInchesSchema({ fieldName: label }).safeParse(candidate);
+      if (parsed.success) onChange(parsed.data);
+    };
+    return (
+      <div className="space-y-1">
+        <Label className="text-xs">{label}</Label>
+        <div className="flex gap-1">
+          <div className="relative flex-1">
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={1}
+              value={split.feet}
+              onChange={(e) => handleChange({ feet: parseFloat(e.target.value) || 0 })}
+              className="pr-7 text-sm tabular-nums"
+            />
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              ft
+            </span>
+          </div>
+          <div className="relative flex-1">
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={step}
+              value={split.inches}
+              onChange={(e) => handleChange({ inches: parseFloat(e.target.value) || 0 })}
+              className="pr-7 text-sm tabular-nums"
+            />
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              in
+            </span>
+          </div>
+        </div>
+        {hint && <div className="text-[10px] text-muted-foreground">{hint}</div>}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
